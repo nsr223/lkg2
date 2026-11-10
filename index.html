@@ -1,0 +1,888 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LKG 2.0 Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Styled after the Ontology Engineering Group website: blue banner with condensed lettering, bevelled tabs and buttons, boxed side panels, Georgia headings on a white column */
+:root{
+  --sky-top:#C9D6EE; --sky-bottom:#FFFFFF; --sheet:#FFFFFF; --edge:#B9C1CC; --ink:#1A1A1A; --muted:#5E6673;
+  --banner:#6C86BF; --banner-deep:#4A66A8; --strip:#3E5B9E; --tab:#6E8DCB; --tab-hi:#8AA6DC; --tab-ink:#FFFFFF;
+  --head:#2E4A82; --red:#D93A2B; --box-head:#4B72B8; --box-edge:#C9CED6; --link:#4A5C8C;
+  --btn-a:#8DAAE0; --btn-b:#5D80C3; --code-ghost:rgba(20,34,74,.55);
+  --l0:#14295A; --l1:#2B4C8E; --l2:#4A72B8; --l3:#7395CF; --l4:#A4BBE3; --l5:#CBD7EE;
+  --ok:#2C6E49; --ok-soft:#E3F0E8; --off:#7A5A12; --off-soft:#F6EEDC; --gone:#6B6F73; --gone-soft:#ECEDEE;
+  --f-display:"Oswald","Arial Narrow",sans-serif; --f-ui:Verdana,Geneva,"DejaVu Sans",sans-serif; --f-head:Georgia,"Times New Roman",serif; --f-code:"JetBrains Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --sky-top:#0E1526; --sky-bottom:#0B0F18; --sheet:#141B2A; --edge:#2C3850; --ink:#E3E8F2; --muted:#9AA5B8;
+  --banner:#2E4682; --banner-deep:#22366A; --strip:#1C2C58; --tab:#3B5699; --tab-hi:#5070B5; --tab-ink:#F2F5FB;
+  --head:#A9C1EE; --red:#F2705F; --box-head:#34528F; --box-edge:#2C3850; --link:#A9BCE6;
+  --btn-a:#5574B5; --btn-b:#3A5594; --code-ghost:rgba(220,230,255,.35);
+  --l0:#DCE6F8; --l1:#B5C9EE; --l2:#8EAAE2; --l3:#6B8DD0; --l4:#4D6EAF; --l5:#36508A;
+  --ok:#7CCB9C; --ok-soft:#1B3326; --off:#E3C27A; --off-soft:#3A2F17; --gone:#A6ACB0; --gone-soft:#262E32; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --sky-top:#0E1526; --sky-bottom:#0B0F18; --sheet:#141B2A; --edge:#2C3850; --ink:#E3E8F2; --muted:#9AA5B8;
+  --banner:#2E4682; --banner-deep:#22366A; --strip:#1C2C58; --tab:#3B5699; --tab-hi:#5070B5; --tab-ink:#F2F5FB;
+  --head:#A9C1EE; --red:#F2705F; --box-head:#34528F; --box-edge:#2C3850; --link:#A9BCE6;
+  --btn-a:#5574B5; --btn-b:#3A5594; --code-ghost:rgba(220,230,255,.35);
+  --l0:#DCE6F8; --l1:#B5C9EE; --l2:#8EAAE2; --l3:#6B8DD0; --l4:#4D6EAF; --l5:#36508A;
+  --ok:#7CCB9C; --ok-soft:#1B3326; --off:#E3C27A; --off-soft:#3A2F17; --gone:#A6ACB0; --gone-soft:#262E32; color-scheme:dark}
+*{box-sizing:border-box}
+html{background:var(--sky-bottom)}
+body{margin:0;color:var(--ink);font:13px/1.55 var(--f-ui);background:linear-gradient(180deg,var(--sky-top) 0,var(--sky-bottom) 520px) no-repeat,var(--sky-bottom);min-height:100vh;
+  padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+a{color:var(--link)}
+.page{max-width:1340px;margin:0 auto;background:var(--sheet);border-left:1px solid var(--edge);border-right:1px solid var(--edge);min-height:100vh;box-shadow:0 0 0 1px rgba(0,0,0,.02),0 0 24px rgba(30,50,100,.08)}
+/* banner */
+.banner{position:relative;overflow:hidden;background:linear-gradient(180deg,var(--banner) 0,var(--banner-deep) 100%);height:200px;display:flex;align-items:center;padding:0 24px}
+.wordmark{position:relative;z-index:1;font:700 clamp(34px,6.4vw,64px)/.92 var(--f-display);letter-spacing:-.01em;color:var(--l0);text-transform:none;margin:0}
+:root[data-theme="dark"] .wordmark{color:#E9EEF9}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .wordmark{color:#E9EEF9}}
+.wordmark .r{color:var(--red)}
+.wordmark small{display:block;font:600 clamp(14px,2vw,20px)/1.2 var(--f-display);letter-spacing:.02em;color:#E9EEF9;margin-top:8px;opacity:.9}
+.ghost{position:absolute;right:-90px;top:-30px;width:62%;transform:rotate(-22deg);transform-origin:center;font:500 clamp(13px,1.8vw,22px)/1.5 var(--f-code);color:var(--code-ghost);white-space:nowrap;pointer-events:none;user-select:none}
+@media (max-width:640px){.ghost{opacity:.45;width:100%}.banner{height:160px}}
+/* tabs */
+.strip{background:linear-gradient(180deg,var(--strip) 0,var(--banner-deep) 100%);padding:8px 8px 0;display:flex;flex-wrap:wrap;gap:6px;border-bottom:1px solid var(--strip)}
+.tab{display:inline-block;padding:7px 16px 8px;background:linear-gradient(180deg,var(--tab-hi),var(--tab));color:var(--tab-ink);font:700 14px var(--f-ui);text-decoration:none;border:1px solid rgba(255,255,255,.25);border-bottom:0;border-radius:3px 3px 0 0;cursor:pointer;text-shadow:0 1px 0 rgba(0,0,0,.25)}
+.tab[aria-current="page"]{background:var(--sheet);color:var(--head);text-shadow:none;border-color:var(--edge)}
+.tab:hover:not([aria-current="page"]){background:linear-gradient(180deg,#9DB5E6,var(--tab-hi))}
+/* search row */
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 16px}
+.bar .grow{flex:1 1 300px;display:flex;gap:8px;min-width:0}
+#q{flex:1;min-width:0;padding:5px 7px;border:1px solid #9AA3B2;border-radius:0;background:var(--sheet);font:bold 13px var(--f-ui);box-shadow:inset 1px 1px 2px rgba(0,0,0,.15)}
+select{padding:5px 6px;border:1px solid #9AA3B2;background:var(--sheet);font-size:12.5px;max-width:100%}
+.btn{display:inline-block;background:linear-gradient(180deg,var(--btn-a),var(--btn-b));color:#fff;border:1px solid #4E6CA8;border-radius:4px;padding:6px 18px;font:bold 13px var(--f-ui);cursor:pointer;text-shadow:0 1px 0 rgba(0,0,0,.3);box-shadow:0 2px 3px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.35)}
+.btn:hover{filter:brightness(1.06)}
+.btn:active{box-shadow:inset 0 1px 3px rgba(0,0,0,.35)}
+.btn[disabled]{opacity:.6;cursor:default}
+.flags{display:flex;gap:6px;margin-left:auto}
+.flags button{border:1px solid transparent;background:none;padding:2px;cursor:pointer;line-height:0;border-radius:2px}
+.flags button[aria-pressed="true"]{border-color:var(--head);box-shadow:0 0 0 1px var(--sheet) inset}
+.flags svg{width:26px;height:16px;display:block}
+/* layout */
+.layout{display:grid;grid-template-columns:250px minmax(0,1fr);gap:20px;padding:4px 16px 24px}
+@media (max-width:820px){.layout{grid-template-columns:1fr}}
+aside{display:grid;gap:14px;align-content:start}
+.box{border:1px solid var(--box-edge);background:var(--sheet)}
+.box h3{margin:0;background:var(--box-head);color:#fff;font:bold 15px var(--f-ui);padding:8px 12px 8px 22px;position:relative}
+.box h3::before{content:"";position:absolute;left:0;top:0;bottom:0;width:8px;background:radial-gradient(circle at 0 25%,rgba(255,255,255,.55) 0 3px,transparent 3.5px),radial-gradient(circle at 0 75%,rgba(255,255,255,.55) 0 3px,transparent 3.5px)}
+.box .in{padding:10px}
+.ladder{display:grid;gap:3px}
+.rung{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;border:0;background:none;padding:4px 4px 4px 0;cursor:pointer;text-align:left;position:relative}
+.rung .bar2{position:absolute;inset:2px auto 2px 0;opacity:.18}
+.rung .nm{position:relative;padding-left:10px;border-left:5px solid var(--c);color:var(--link);text-decoration:underline;text-underline-offset:2px;font-size:12.5px}
+.rung .ct{position:relative;font:12px var(--f-code);font-variant-numeric:tabular-nums;color:var(--muted)}
+.rung[aria-pressed="true"] .nm{font-weight:bold;color:var(--head);text-decoration:none}
+.rung.dim{opacity:.55}
+.note{font-size:11.5px;color:var(--muted);margin:8px 0 0}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{border:1px solid #9AA3B2;background:linear-gradient(180deg,#FFFFFF,#E7ECF5);border-radius:3px;padding:2px 8px;font-size:12px;cursor:pointer;color:#22325A}
+.chip[aria-pressed="true"]{background:linear-gradient(180deg,var(--btn-a),var(--btn-b));color:#fff;border-color:#4E6CA8}
+:root[data-theme="dark"] .chip:not([aria-pressed="true"]){background:var(--sheet);color:var(--ink)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .chip:not([aria-pressed="true"]){background:var(--sheet);color:var(--ink)}}
+.count{font:13px var(--f-ui);color:var(--muted);margin:2px 0 10px;font-variant-numeric:tabular-nums}
+.main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,430px);gap:22px;align-items:start}
+@media (max-width:1100px){.main{grid-template-columns:1fr}}
+.list{display:grid;gap:0;min-width:0}
+.row{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;background:none;border:0;border-bottom:1px dotted var(--box-edge);padding:10px 2px;cursor:pointer;text-align:left;width:100%}
+.row:hover .t{text-decoration:underline}
+.row[aria-current="true"]{background:linear-gradient(90deg,rgba(75,114,184,.10),transparent)}
+.lv{width:5px;align-self:stretch;background:var(--c)}
+.rt{min-width:0}
+.rt .t{display:block;font:bold 15.5px/1.3 var(--f-head);color:var(--head);overflow-wrap:anywhere}
+.rt .m{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:4px;font-size:11.5px;color:var(--muted)}
+.code{font-family:var(--f-code);font-size:11.5px}
+.st{font-size:11px;font-weight:bold;border-radius:2px;padding:0 6px}
+.st.s0{background:var(--ok-soft);color:var(--ok)} .st.s1{background:var(--gone-soft);color:var(--gone)} .st.s2{background:var(--off-soft);color:var(--off)} .st.s3{background:var(--gone-soft);color:var(--muted)}
+.more{margin:14px 0 0}
+.panel{position:sticky;top:max(10px,env(safe-area-inset-top,0px));max-height:calc(100vh - 20px);overflow:auto;min-width:0}
+@media (max-width:1100px){.panel{position:static;max-height:none}}
+.panel.inline{margin:4px 0 14px;border-color:var(--box-head);box-shadow:0 2px 10px rgba(30,50,100,.15)}
+.panel .in{display:grid;gap:12px}
+.panel h2{font:bold 21px/1.25 var(--f-head);color:var(--head);margin:0;overflow-wrap:anywhere}
+.eyebrow{font:bold 11px var(--f-ui);letter-spacing:.04em;color:var(--red);text-transform:uppercase}
+dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:5px 12px;margin:0;font-size:12.5px}
+dt{color:var(--muted)} dd{margin:0;overflow-wrap:anywhere}
+.label{font:bold 12px var(--f-ui);color:var(--head);margin:0 0 6px;border-bottom:1px solid var(--box-edge);padding-bottom:3px}
+.summary{font:14px/1.6 var(--f-head);background:linear-gradient(180deg,rgba(75,114,184,.07),transparent);border-left:4px solid var(--box-head);padding:8px 12px;white-space:pre-wrap}
+.refs{display:grid;gap:2px}
+.ref{display:grid;grid-template-columns:minmax(0,auto) minmax(0,1fr);gap:8px;font-size:12px;border:0;background:none;padding:4px 0;text-align:left;cursor:pointer;border-bottom:1px dotted var(--box-edge)}
+.ref .rel{font:bold 10.5px var(--f-ui);color:var(--red);text-transform:uppercase;white-space:nowrap}
+.ref .to{overflow-wrap:anywhere;color:var(--link);text-decoration:underline;text-underline-offset:2px}
+.ref[disabled]{cursor:default} .ref[disabled] .to{text-decoration:none;color:var(--muted)}
+.empty{color:var(--muted);font-size:13px;padding:16px;border:1px dashed var(--box-edge)}
+.about{padding:6px 16px 28px;max-width:860px}
+.about h2{font:bold 26px/1.25 var(--f-head);color:var(--head);margin:10px 0 12px}
+.about h3{font:bold 18px var(--f-head);color:var(--head);margin:20px 0 6px}
+.about p,.about li{font-size:13.5px;max-width:72ch}
+.foot{color:var(--muted);font-size:11.5px;border-top:1px solid var(--box-edge);padding:12px 16px 18px}
+.reader{position:fixed;inset:0;z-index:50;background:rgba(10,20,45,.45);display:flex;justify-content:center;padding:max(12px,env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) max(12px,env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
+.reader .sheet{background:var(--sheet);width:100%;max-width:900px;display:flex;flex-direction:column;border:1px solid var(--edge);box-shadow:0 10px 40px rgba(0,0,0,.35);min-height:0}
+.reader .rhead{background:var(--box-head);color:#fff;padding:10px 14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.reader .rhead strong{flex:1 1 300px;font:bold 15px/1.3 var(--f-head);min-width:0;overflow-wrap:anywhere}
+.reader .rhead input{width:90px;padding:4px 6px;border:1px solid #9AA3B2;font-size:12.5px;color:#111;background:#fff}
+.reader .rbody{overflow:auto;padding:16px 22px 40px;font:14.5px/1.65 var(--f-head);min-height:0;flex:1}
+.reader .rbody h4{font:bold 15px var(--f-ui);color:var(--head);margin:22px 0 6px}
+.reader .rbody h5{font:bold 14px var(--f-ui);color:var(--head);margin:18px 0 4px}
+.reader .rbody .art{font:bold 14px var(--f-head);color:var(--red);margin:16px 0 4px}
+.reader .rbody p{margin:0 0 8px;max-width:78ch}
+.reader .rbody .hit{background:rgba(217,58,43,.12);outline:2px solid var(--red);outline-offset:4px}
+.reader .rnote{font:12px var(--f-ui);color:var(--muted);border-bottom:1px solid var(--box-edge);padding:8px 22px;background:rgba(75,114,184,.06)}
+.reader .rtools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 22px;border-bottom:1px solid var(--box-edge);font:12.5px var(--f-ui);background:var(--sheet)}
+.reader .rtools input[type=date]{padding:3px 6px;border:1px solid #9AA3B2;font-size:12.5px;background:var(--sheet)}
+.hbtn{border:1px solid var(--box-edge);background:none;color:var(--link);font:11.5px var(--f-ui);padding:1px 8px;border-radius:3px;cursor:pointer;margin-left:6px;vertical-align:middle}
+.hist{border-left:3px solid var(--box-head);margin:4px 0 12px;padding:6px 10px;background:rgba(75,114,184,.06);font:12.5px/1.5 var(--f-ui)}
+.hist .hv{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;padding:3px 0;border-bottom:1px dotted var(--box-edge)}
+.hist .old{font:13.5px/1.6 var(--f-head);margin:6px 0 8px;padding:8px;background:var(--sheet);border:1px solid var(--box-edge);white-space:pre-wrap}
+.hist del{background:rgba(217,58,43,.18);text-decoration:line-through}
+.hist ins{background:rgba(44,110,73,.22);text-decoration:none}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+
+<div class="page">
+  <div class="banner">
+    <p class="wordmark"><span class="r">L</span>egal <span class="r">K</span>nowledge <span class="r">G</span>raph 2.0<small data-t="tagline"></small></p>
+    <div class="ghost" aria-hidden="true">
+      &lt;eli:is_realized_by eli:LegalResourceSubdivision;<br>
+      &nbsp;&nbsp;eli:jurisdiction &lt;es&gt; ; eli:in_force eli:InForce ;<br>
+      &nbsp;eli:date_document "2015-10-23"^^xsd:date ;<br>
+      eli:changed_by &lt;/eli/es/rdl/2015/10/23/2&gt; ;<br>
+      &nbsp;&nbsp;skos:prefLabel "Estatuto de los Trabajadores"@es ;<br>
+      eurovoc:4171 derecho_laboral ; eli:cites &lt;/eli/es/c/1978&gt;
+    </div>
+  </div>
+  <nav class="strip" aria-label="Secciones">
+    <a class="tab" href="#" data-view="explore" data-t="tabExplore" aria-current="page"></a>
+    <a class="tab" href="#" data-view="about" data-t="tabAbout"></a>
+    <a class="tab" href="https://oeg.fi.upm.es" target="_blank" rel="noopener">OEG</a>
+    <a class="tab" href="https://github.com/legalize-dev/legalize-es" target="_blank" rel="noopener">legalize-es</a>
+    <a class="tab" href="https://www.boe.es" target="_blank" rel="noopener">BOE</a>
+  </nav>
+
+  <div id="view-explore">
+    <div class="bar">
+      <div class="grow">
+        <input id="q" type="search" autocomplete="off">
+        <button class="btn" id="go" type="button" data-t="searchBtn"></button>
+      </div>
+      <select id="jur"><option value="" data-t="allJur"></option></select>
+      <select id="sort"><option value="new" data-t="sortNew"></option><option value="old" data-t="sortOld"></option><option value="rank" data-t="sortRank"></option></select>
+      <div class="flags" role="group" aria-label="Idioma / Language">
+        <button type="button" data-lang="es" lang="es" aria-label="Español"><svg viewBox="0 0 26 16" aria-hidden="true"><rect width="26" height="16" fill="#AA151B"/><rect y="4" width="26" height="8" fill="#F1BF00"/></svg></button>
+        <button type="button" data-lang="en" lang="en" aria-label="English"><svg viewBox="0 0 60 30" aria-hidden="true"><clipPath id="uk"><path d="M0 0v30h60V0z"/></clipPath><g clip-path="url(#uk)"><path d="M0 0v30h60V0z" fill="#012169"/><path d="M0 0l60 30m0-30L0 30" stroke="#fff" stroke-width="6"/><path d="M0 0l60 30m0-30L0 30" stroke="#C8102E" stroke-width="2.5"/><path d="M30 0v30M0 15h60" stroke="#fff" stroke-width="10"/><path d="M30 0v30M0 15h60" stroke="#C8102E" stroke-width="6"/></g></svg></button>
+      </div>
+    </div>
+
+    <div class="layout">
+      <aside>
+        <div class="box"><h3 data-t="hier"></h3><div class="in">
+          <div class="ladder" id="ladder"></div>
+          <p class="note" data-t="hierNote"></p>
+        </div></div>
+        <div class="box"><h3 data-t="validity"></h3><div class="in"><div class="chips" id="status"></div></div></div>
+      </aside>
+
+      <section id="results">
+        <p class="count" id="count"></p>
+        <div class="main">
+          <div>
+            <div class="list" id="list"><div class="empty" data-t="loadingList"></div></div>
+            <div class="more"><button class="btn" id="more" type="button" hidden></button></div>
+          </div>
+          <div class="panel box" id="panelbox"><h3 data-t="lawBox"></h3><div class="in" id="panel"></div></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div id="view-about" class="about" hidden>
+    <h2 data-t="aboutTitle"></h2>
+    <p data-t="about1"></p>
+    <p data-t="about2"></p>
+    <h3 data-t="aboutNextTitle"></h3>
+    <ul><li data-t="next1"></li><li data-t="next2"></li><li data-t="next3"></li><li data-t="next4"></li></ul>
+  </div>
+
+  <p class="foot"><span data-t="footData"></span> <a href="https://github.com/legalize-dev/legalize-es" target="_blank" rel="noopener">legalize-es</a>, <span data-t="footBased"></span> (<a href="https://www.boe.es" target="_blank" rel="noopener">boe.es</a>). <span data-t="footInfo"></span> <span id="built"></span>. <a href="https://github.com/nsr223/lkg2" target="_blank" rel="noopener">GitHub</a>.</p>
+</div>
+
+<script>
+const T = {
+  es: {
+    tagline: "Explorador de la legislación española publicada en el BOE · prototipo OEG · UPM",
+    ldLabel: "Datos enlazados (ELI)", ldJson: "JSON-LD", ldTtl: "Turtle", ldDl: "Descargar", ldHide: "Ocultar", ldShow: "Ver",
+    ldNote: "Metadatos ELI oficiales del BOE (incluidos en legalize-es), con lo que añade LKG 2.0: vigencia, nivel jerárquico, relaciones con otras normas, EuroVoc y, en algunas normas, las versiones de cada artículo. El espacio de nombres urn:lkg2: es provisional.",
+    ldBusy: "Cargando relaciones…", ldSaved: "Descargado.", ldFail: "No se pudo descargar el archivo.",
+    subjEv: "Materias del BOE y conceptos EuroVoc", evRel: ["mismo concepto", "concepto cercano", "concepto más amplio"], evReviewed: "revisado",
+    evNote: "= mismo concepto · ≈ concepto cercano · ⊂ EuroVoc es más amplio. Enlaces automáticos por etiqueta (y revisados a mano en las materias más usadas); pueden contener errores.",
+    hAt: "Ver la norma vigente el", hToday: "Hoy", hShowing: (d, n) => `Versión vigente el ${d} · historial de ${n} versiones (artículo por artículo, desde legalize-es).`,
+    hBtn: n => `Historial · ${n}`, hSince: "desde", hUntil: "hasta", hOrig: "texto original", hBy: "por", hView: "Ver", hHide: "Ocultar", hRemoved: "derogado / suprimido",
+    hDiff: "Cambios respecto a la versión anterior: tachado = suprimido, resaltado = añadido.", hNotYet: "No existía en esa fecha.", hNone: "Sin texto en esa fecha.",
+    hPanel: (n, c, y0, y1) => `Historial artículo por artículo: ${n} versiones (${y0}–${y1}), ${c} cambios en artículos. Puedes leer la norma tal como estaba en cualquier fecha.`,
+    txtConsol: "Consolidado", txtConsolNote: "El texto incluye las reformas posteriores.", txtEnacted: "Texto original", txtEnactedNote: "Texto tal como se publicó, sin las reformas posteriores; las reformas son normas aparte.",
+    txtLabel: "Texto", txtOpen: "Leer el texto aquí", txtPdf: "PDF consolidado (BOE)", txtPdfOrig: "PDF original (BOE del día)", txtLoading: "Cargando el texto…",
+    txtClose: "Cerrar", txtGo: "Ir", txtArt: "Artículo", txtNoArt: "No se encontró ese artículo.", txtSrc: "Texto de legalize-es (fuente: BOE). Versión del",
+    txtFallback: "El texto completo no se puede cargar en esta vista. Se muestra el comienzo; el texto entero está en el BOE y en legalize-es.",
+    tabExplore: "Explorador", tabAbout: "Acerca de", searchBtn: "Buscar", lawBox: "Norma",
+    sumLabel: "Resumen", sumBtn: "Generar resumen", sumBusy: "Generando resumen…", sumNote: "Resumen generado por IA a partir del inicio del texto oficial. Puede contener errores: consulta siempre el texto en el BOE.",
+    sumNone: "Todavía no hay resumen de esta norma.", sumOff: "Los resúmenes con IA solo están disponibles al abrir esta página en Claude.", sumFail: "No se pudo generar el resumen. Inténtalo de nuevo más tarde.", sumRate: "Demasiadas solicitudes seguidas. Espera un momento.",
+    aboutTitle: "Acerca del LKG 2.0 Explorer",
+    about1: "Este prototipo es el punto de partida del Legal Knowledge Graph 2.0 del Ontology Engineering Group (UPM). Reúne en una sola página las casi 26.000 normas del BOE publicadas en el repositorio abierto legalize-es, estatales y autonómicas, ordenadas según la jerarquía normativa. Unas 12.400 tienen texto consolidado, con sus reformas incorporadas; el resto se ofrece con su texto original.",
+    about2: "Cada norma muestra su rango, su vigencia, sus fechas, su identificador ELI (European Legislation Identifier) y sus relaciones con otras normas: qué normas cita o modifica y cuáles la modifican o derogan. Esas relaciones son las aristas del grafo de conocimiento.",
+    aboutNextTitle: "Próximos pasos",
+    next1: "EuroVoc: hecho en una primera versión. Unas 1.550 materias del BOE, que cubren el 77 % de sus usos, están enlazadas con conceptos del tesauro EuroVoc; falta revisar el resto. Gracias a las etiquetas de EuroVoc también se puede buscar en inglés.",
+    next2: "Publicar los metadatos de cada norma como datos enlazados siguiendo la ontología ELI.",
+    next3: "Mostrar la historia de versiones de cada artículo a partir del historial de legalize-es.",
+    next4: "Ofrecer las normas a modelos locales mediante un servidor MCP, para que respondan citando la versión vigente.",
+    aboutAiTitle: "Sobre los resúmenes",
+    aboutAi: "Los resúmenes se generan con IA a petición, a partir del título, los metadatos y el comienzo del texto de cada norma (preámbulo y artículo 1). Una vez generado, el resumen se guarda y lo ven todos los visitantes. Son orientativos y no sustituyen al texto oficial.",
+    lede: "Toda la legislación consolidada del BOE en legalize-es, ordenada por jerarquía normativa. Busca una norma, filtra por rango, ámbito y vigencia, y sigue sus referencias a otras normas.",
+    search: "Busca por título, número o materia (p. ej. «Estatuto de los Trabajadores», «2/2015», «Despidos»)", searchLabel: "Buscar normas",
+    jurLabel: "Ámbito", allJur: "Todos los ámbitos", sortLabel: "Orden", sortNew: "Más recientes primero", sortOld: "Más antiguas primero", sortRank: "Por jerarquía",
+    hier: "Jerarquía normativa", hierNote: "De arriba abajo: cada nivel debe respetar a los superiores. Pulsa un nivel para filtrar.", validity: "Vigencia", results: "Resultados",
+    loadingIndex: "Cargando el índice de normas…", loadingList: "Cargando unas 26.000 normas de legalize-es…", loadFail: "No se pudo cargar el índice de normas. Recarga la página.",
+    count: n => `${n} normas`, countQ: q => ` para «${q}»`, none: "Ninguna norma coincide. Prueba con menos palabras o quita algún filtro.", more: n => `Mostrar más (${n} restantes)`,
+    pick: "Elige una norma", pickNote: "Aquí verás su rango, fechas, vigencia, identificador ELI, materias y las normas a las que remite o que la modifican.",
+    rank: "Rango", since: "desde", pub: "Publicación", force: "Entrada en vigor", upd: "Última actualización", dept: "Órgano", arts: "Artículos", id: "Identificador", text: "Texto",
+    subjects: "Materias", subjNote: "", prev: "Remite a (normas anteriores)", next: "Afectada por (normas posteriores)", loadingRefs: "Cargando relaciones…", moreRefs: (a, b) => `Ver ${a} más de ${b}`,
+    footData: "Datos:", footBased: "basado en los textos consolidados de la Agencia Estatal Boletín Oficial del Estado", footInfo: "Textos de carácter meramente informativo. Índice generado el",
+    status: ["Vigente", "Derogada", "Sin efecto", "Otro"], national: "Estatal",
+    levels: [["Constitución"], ["Ley orgánica"], ["Ley", "leyes estatales, autonómicas y forales"], ["Norma con rango de ley", "decretos-leyes y decretos legislativos"], ["Reglamento", "reales decretos y decretos"], ["Órdenes y otras disposiciones", "órdenes, resoluciones, circulares, tratados internacionales…"]],
+    locale: "es-ES"
+  },
+  en: {
+    tagline: "Explorer for Spanish legislation published in the BOE · OEG prototype · UPM",
+    ldLabel: "Linked data (ELI)", ldJson: "JSON-LD", ldTtl: "Turtle", ldDl: "Download", ldHide: "Hide", ldShow: "View",
+    ldNote: "The BOE's official ELI metadata (included in legalize-es), plus what LKG 2.0 adds: in-force status, hierarchy level, links to other laws, EuroVoc and, for some laws, the versions of each article. The urn:lkg2: namespace is provisional.",
+    ldBusy: "Loading links…", ldSaved: "Downloaded.", ldFail: "The file could not be downloaded.",
+    subjEv: "BOE subjects and EuroVoc concepts", evRel: ["same concept", "close concept", "broader concept"], evReviewed: "reviewed",
+    evNote: "= same concept · ≈ close concept · ⊂ EuroVoc is broader. Links made automatically from labels (and reviewed by hand for the most-used subjects); they may contain errors.",
+    hAt: "Show the law as in force on", hToday: "Today", hShowing: (d, n) => `Version in force on ${d} · history of ${n} versions (article by article, from legalize-es).`,
+    hBtn: n => `History · ${n}`, hSince: "since", hUntil: "until", hOrig: "original text", hBy: "by", hView: "View", hHide: "Hide", hRemoved: "repealed / removed",
+    hDiff: "Changes from the previous version: struck through = removed, highlighted = added.", hNotYet: "Did not exist on that date.", hNone: "No text on that date.",
+    hPanel: (n, c, y0, y1) => `Article-by-article history: ${n} versions (${y0}–${y1}), ${c} changes to articles. You can read the law as it stood on any date.`,
+    txtConsol: "Consolidated", txtConsolNote: "The text includes later amendments.", txtEnacted: "Original text", txtEnactedNote: "The text as published, without later amendments; amendments are separate laws.",
+    txtLabel: "Text", txtOpen: "Read the text here", txtPdf: "Consolidated PDF (BOE)", txtPdfOrig: "Original PDF (BOE issue)", txtLoading: "Loading the text…",
+    txtClose: "Close", txtGo: "Go", txtArt: "Article", txtNoArt: "That article was not found.", txtSrc: "Text from legalize-es (source: BOE). Version of",
+    txtFallback: "The full text cannot be loaded in this view. The start is shown below; the whole text is on the BOE and legalize-es.",
+    tabExplore: "Explorer", tabAbout: "About", searchBtn: "Search", lawBox: "Law",
+    sumLabel: "Summary", sumBtn: "Generate summary", sumBusy: "Writing summary…", sumNote: "AI-generated summary based on the start of the official text. It may contain errors: always check the text in the BOE.",
+    sumNone: "There is no summary of this law yet.", sumOff: "AI summaries are only available when this page is opened in Claude.", sumFail: "The summary could not be generated. Please try again later.", sumRate: "Too many requests in a row. Please wait a moment.",
+    aboutTitle: "About the LKG 2.0 Explorer",
+    about1: "This prototype is the starting point of the Ontology Engineering Group's (UPM) Legal Knowledge Graph 2.0. It brings together, on one page, the almost 26,000 laws of the BOE (Spain's Official State Gazette) published in the open legalize-es repository, national and regional, ordered by the hierarchy of legal norms. About 12,400 have a consolidated text, with their amendments incorporated; the rest come with their original text.",
+    about2: "Each law shows its rank, status, dates, ELI identifier (European Legislation Identifier) and its links to other laws: which laws it cites or amends, and which laws amend or repeal it. Those links are the edges of the knowledge graph.",
+    aboutNextTitle: "Next steps",
+    next1: "EuroVoc: done in a first version. About 1,550 BOE subjects, covering 77% of their uses, are linked to EuroVoc concepts; the rest still need review. Thanks to EuroVoc labels you can also search in English.",
+    next2: "Publish each law's metadata as linked data using the ELI ontology.",
+    next3: "Show the version history of each article, from the legalize-es history.",
+    next4: "Serve the laws to local models through an MCP server, so they answer citing the version in force.",
+    aboutAiTitle: "About the summaries",
+    aboutAi: "Summaries are written by AI on request, from each law's title, metadata and the start of its text (preamble and article 1). Once written, a summary is saved and shown to every visitor. They are a guide only and do not replace the official text.",
+    lede: "All consolidated Spanish legislation from the BOE (Official State Gazette), via legalize-es, ordered by the hierarchy of legal norms. Search for a law, filter by rank, jurisdiction and status, and follow its references to other laws. Law titles stay in Spanish.",
+    search: "Search by title, number or subject (e.g. “Estatuto de los Trabajadores”, “2/2015”, “Despidos”)", searchLabel: "Search laws",
+    jurLabel: "Jurisdiction", allJur: "All jurisdictions", sortLabel: "Order", sortNew: "Newest first", sortOld: "Oldest first", sortRank: "By hierarchy",
+    hier: "Hierarchy of norms", hierNote: "Top to bottom: each level must respect the levels above it. Click a level to filter.", validity: "Status", results: "Results",
+    loadingIndex: "Loading the law index…", loadingList: "Loading about 26,000 laws from legalize-es…", loadFail: "The law index could not be loaded. Please reload the page.",
+    count: n => `${n} laws`, countQ: q => ` for “${q}”`, none: "No law matches. Try fewer words or remove a filter.", more: n => `Show more (${n} left)`,
+    pick: "Choose a law", pickNote: "Here you will see its rank, dates, status, ELI identifier, subjects, and the laws it refers to or that amend it.",
+    rank: "Rank", since: "since", pub: "Published", force: "Entry into force", upd: "Last updated", dept: "Issuing body", arts: "Articles", id: "Identifier", text: "Text",
+    subjects: "Subjects (BOE labels, in Spanish)", prev: "Refers to (earlier laws)", next: "Affected by (later laws)", loadingRefs: "Loading links…", moreRefs: (a, b) => `Show ${a} more of ${b}`,
+    footData: "Data:", footBased: "based on the consolidated texts of the Agencia Estatal Boletín Oficial del Estado", footInfo: "Texts for information only. Index built on",
+    status: ["In force", "Repealed", "Expired", "Other"], national: "National",
+    levels: [["Constitution"], ["Organic law"], ["Law", "national, regional and foral laws"], ["Decree with the force of law", "decree-laws and legislative decrees"], ["Regulation", "royal decrees and decrees"], ["Orders and other provisions", "orders, resolutions, circulars, international treaties…"]],
+    locale: "en-GB"
+  }
+};
+const REL_EN = {"DE CONFORMIDAD CON": "in accordance with", "SE MODIFICA": "amended by", "MODIFICA": "amends", "CITA": "cites", "DEROGA": "repeals", "SE DEROGA": "repealed by", "SE DICTA DE CONFORMIDAD": "basis for", "EN RELACIÓN CON": "related to", "SE DICTA EN RELACIÓN": "related act", "SE DECLARA": "declared by", "CORRECCIÓN DE ERRORES": "corrects errors in", "TRANSPONE": "transposes", "SE AÑADE": "added to by", "AÑADE": "adds to", "SE PUBLICA ACUERDO DE CONVALIDACIÓN": "validated by", "PUBLICA ACUERDO DE CONVALIDACIÓN": "validates", "SE CORRIGEN ERRORES": "errors corrected by", "SE ACTUALIZA": "updated by", "ACTUALIZA": "updates", "SE DESARROLLA": "implemented by", "DESARROLLA": "implements", "CORRECCIÓN DE ERRATAS": "corrects typos in", "RECURSO": "appeal", "PRORROGA": "extends", "SE PRORROGA": "extended by", "ENMIENDAS": "amendments", "DEJA SIN EFECTO": "annuls", "SE DEJA SIN EFECTO": "annulled by", "SE SUSTITUYE": "replaced by", "SUSTITUYE": "replaces", "SE AMPLÍA": "extended by", "AMPLÍA": "extends", "SE SUSPENDE": "suspended by", "SUSPENDE": "suspends", "DECLARA LA VIGENCIA": "declares in force", "PUBLICA": "publishes", "SE PUBLICA": "published by", "CUESTIÓN": "court question", "SUPRIME": "removes", "SE SUPRIME": "removed by"};
+const RANKS = {
+  "constitucion": ["constitucion"], "ley_organica": ["ley_organica"], "ley": ["ley", "ley_foral"],
+  "rango": ["real_decreto_ley", "real_decreto_legislativo", "decreto_ley", "decreto_legislativo", "decreto_ley_foral", "decreto_foral_legislativo"],
+  "reglamento": ["real_decreto", "decreto", "decreto_foral", "reglamento"]
+};
+const LEVEL_RANKS = [RANKS.constitucion, RANKS.ley_organica, RANKS.ley, RANKS.rango, RANKS.reglamento, null];
+const JUR = {"es-an":"Andalucía","es-ar":"Aragón","es-as":"Asturias","es-cb":"Cantabria","es-cl":"Castilla y León","es-cm":"Castilla-La Mancha","es-cn":"Canarias","es-ct":"Cataluña","es-ex":"Extremadura","es-ga":"Galicia","es-ib":"Illes Balears","es-mc":"Región de Murcia","es-md":"Comunidad de Madrid","es-nc":"Navarra","es-pv":"País Vasco","es-ri":"La Rioja","es-vc":"Comunitat Valenciana","es-ce":"Ceuta","es-ml":"Melilla"};
+const RANKNAME = r => r.replace(/_/g, " ").replace(/^./, c => c.toUpperCase());
+const $ = s => document.querySelector(s);
+const norm = s => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+const st = {ld: null, view: "explore", sums: {}, sumBusy: null, excerpts: {}, lang: "es", refs: null, refsP: null, data: null, byId: new Map(), level: null, status: new Set([0]), shown: 50, sel: null, q: "", jur: "", sort: "new"};
+try { const s = localStorage.getItem("lkg-lang"); st.lang = s === "en" || s === "es" ? s : ((navigator.language || "es").toLowerCase().startsWith("es") ? "es" : "en"); } catch (e) {}
+const t = k => T[st.lang][k];
+const num = n => n.toLocaleString(t("locale"));
+const jurName = j => j === "es" ? t("national") : (JUR[j] || j);
+const levelName = i => t("levels")[i][0];
+const relName = r => { r = r.replace(/\s+/g, " "); return st.lang === "en" ? (REL_EN[r] || r.toLowerCase()) : r.toLowerCase(); };
+
+function el(tag, a = {}, ...k){ const n = document.createElement(tag); for (const [x, v] of Object.entries(a)) { if (x === "class") n.className = v; else if (x === "text") n.textContent = v; else if (x === "style") n.setAttribute("style", v); else if (x.startsWith("on")) n.addEventListener(x.slice(2), v); else if (v !== null && v !== undefined) n.setAttribute(x, v); } for (const c of k) if (c != null) n.append(c); return n; }
+const levelOf = rank => { const i = LEVEL_RANKS.findIndex(r => r && r.includes(rank)); return i < 0 ? 5 : i; };
+const color = i => `var(--l${i})`;
+const fmt = d => d ? new Date(d + "T00:00:00").toLocaleDateString(t("locale"), {day: "numeric", month: "short", year: "numeric"}) : "—";
+
+function applyLang(){
+  document.documentElement.lang = st.lang;
+  document.querySelectorAll("[data-t]").forEach(n => { n.textContent = t(n.dataset.t); });
+  document.querySelectorAll(".flags button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lang === st.lang)));
+  $("#q").placeholder = t("search"); $("#q").setAttribute("aria-label", t("searchLabel"));
+  $("#jur").setAttribute("aria-label", t("jurLabel")); $("#sort").setAttribute("aria-label", t("sortLabel"));
+  $("#results").setAttribute("aria-label", t("results"));
+  $("#jur").querySelectorAll("option[value]").forEach(o => { if (o.value) o.textContent = jurName(o.value); });
+  if (!st.data) $("#count").textContent = t("loadingIndex");
+  if (st.sel) select(st.sel, true); else emptyPanel();
+  render();
+}
+function emptyPanel(){ $("#panel").replaceChildren(el("h2", {text: t("pick")}), el("p", {class: "note", style: "margin:0", text: t("pickNote")})); }
+
+function prepare(raw){
+  const D = raw.dict;
+  const laws = raw.laws.map(a => {
+    const rank = D.rank[a[2]];
+    const subj = a[10].map(i => D.subj[i]);
+    const evs = st.ev ? a[10].map(i => st.ev.map[i]).filter(Boolean) : [];
+    const evText = evs.map(m => st.ev.concepts[m[0]][1] + " " + (st.ev.concepts[m[0]][2] || "")).join(" ");
+    return {id: a[0], title: a[1], rank, level: levelOf(rank), jur: D.jur[a[3]], status: a[4], pub: a[5], force: a[6], upd: a[7], eli: a[8],
+      dept: D.dept[a[9]], subj, num: a[11], arts: a[12],
+      nPrev: a[13], nNext: a[14], repeal: a[15], enacted: a[17] === 1, pdfOrig: a[18] ? "https://www.boe.es/boe/dias/" + a[18] : null, enact: a[19] || null, path: `${D.jur[a[3]]}/${a[16]}/${a[0]}.md`, bucket: a[16], subjIdx: a[10], key: norm(a[1] + " " + (a[11] || "") + " " + a[0] + " " + subj.join(" ") + " " + evText)};
+  });
+  st.data = laws; for (const l of laws) st.byId.set(l.id, l);
+  st.rel = D.rel; st.subjcode = D.subjcode || null;
+  const jurs = [...new Set(laws.map(l => l.jur))].sort((x, y) => (x === "es" ? -1 : y === "es" ? 1 : jurName(x).localeCompare(jurName(y))));
+  for (const j of jurs) $("#jur").append(el("option", {value: j, text: jurName(j)}));
+  $("#built").textContent = raw.meta.built || "";
+}
+
+function filtered(skip){
+  const words = norm(st.q).split(/\s+/).filter(Boolean);
+  return st.data.filter(l => (skip === "level" || st.level === null || l.level === st.level)
+    && (skip === "status" || !st.status.size || st.status.has(l.status))
+    && (!st.jur || l.jur === st.jur)
+    && words.every(w => l.key.includes(w)));
+}
+
+function renderLadder(){
+  const base = filtered("level"); const counts = Array(6).fill(0); for (const l of base) counts[l.level]++;
+  const max = Math.max(1, ...counts); const box = $("#ladder"); box.replaceChildren();
+  t("levels").forEach(([name, hint], i) => {
+    const on = st.level === i;
+    box.append(el("button", {type: "button", class: "rung" + (st.level !== null && !on ? " dim" : ""), "aria-pressed": String(on), style: `--c:${color(i)}`,
+      title: hint || "", onclick: () => { st.level = on ? null : i; st.shown = 50; render(); }},
+      el("span", {class: "bar2", style: `width:${(counts[i] / max) * 100}%;background:${color(i)}`}),
+      el("span", {class: "nm", text: name}), el("span", {class: "ct", text: num(counts[i])})));
+  });
+}
+function renderStatus(){
+  const base = filtered("status"); const counts = [0, 0, 0, 0]; for (const l of base) counts[l.status]++;
+  const box = $("#status"); box.replaceChildren();
+  t("status").forEach((s, i) => { if (!counts[i] && !st.status.has(i)) return;
+    box.append(el("button", {type: "button", class: "chip", "aria-pressed": String(st.status.has(i)), onclick: () => { st.status.has(i) ? st.status.delete(i) : st.status.add(i); st.shown = 50; render(); }},
+      `${s} · ${num(counts[i])}`)); });
+}
+
+function rowFor(l){
+  return el("button", {type: "button", class: "row", "data-id": l.id, "aria-current": String(st.sel === l.id), "aria-expanded": String(st.sel === l.id), onclick: () => {
+      if (st.sel === l.id && isNarrow()) { st.sel = null; emptyPanel(); render(); return; }   // tap again to close on small screens
+      select(l.id); if (isNarrow()) { const r = document.querySelector(`#list .row[data-id="${l.id}"]`); if (r) r.scrollIntoView({block: "nearest"}); }
+    }},
+    el("span", {class: "lv", style: `--c:${color(l.level)}`, "aria-hidden": "true"}),
+    el("span", {class: "rt"}, el("span", {class: "t", text: l.title, lang: "es"}),
+      el("span", {class: "m"}, el("span", {text: levelName(l.level)}), el("span", {text: jurName(l.jur)}),
+        el("span", {text: fmt(l.pub)}), el("span", {class: "st s" + l.status, text: t("status")[l.status]}))));
+}
+
+function sorted(arr){
+  const by = st.sort;
+  return arr.sort((a, b) => by === "rank" ? (a.level - b.level) || (b.pub || "").localeCompare(a.pub || "") :
+    by === "old" ? (a.pub || "9").localeCompare(b.pub || "9") : (b.pub || "").localeCompare(a.pub || ""));
+}
+
+function render(){
+  if (!st.data) return;
+  renderLadder(); renderStatus();
+  const res = sorted(filtered());
+  $("#count").textContent = t("count")(num(res.length)) + (st.q ? t("countQ")(st.q) : "");
+  const list = $("#list"); list.replaceChildren();
+  if (!res.length) list.append(el("div", {class: "empty", text: t("none")}));
+  for (const l of res.slice(0, st.shown)) list.append(rowFor(l));
+  $("#more").hidden = res.length <= st.shown;
+  $("#more").textContent = t("more")(num(res.length - st.shown));
+  placePanel();
+}
+const isNarrow = () => innerWidth < 1100;
+let PANELBOX = null;   // kept as a reference: the box is moved in and out of the list, so it is not always in the document
+function placePanel(){
+  const box = PANELBOX || (PANELBOX = $("#panelbox")), main = document.querySelector(".main"), list = $("#list");
+  if (!isNarrow()) { if (box.parentElement !== main) main.append(box); box.classList.remove("inline"); box.hidden = false; return; }
+  box.classList.add("inline");
+  if (!st.sel) { box.hidden = true; if (box.parentElement !== main) main.append(box); return; }
+  box.hidden = false;
+  const row = list.querySelector(`.row[data-id="${st.sel}"]`);
+  if (row) row.after(box); else list.before(box);   // a law not in the visible list (e.g. opened from a link) shows above the list
+}
+addEventListener("resize", () => placePanel());
+
+const SHOW = 30;
+function refList(items, total, label){
+  if (!total) return null;
+  const box = el("div", {class: "refs"});
+  if (!items) { box.append(el("p", {class: "note", text: t("loadingRefs")})); }
+  const draw = n => { box.replaceChildren(); for (const [r, to] of items.slice(0, n)) {
+    const tg = st.byId.get(to);
+    box.append(el("button", {type: "button", class: "ref", disabled: tg ? null : "", onclick: tg ? () => select(to) : null},
+      el("span", {class: "rel", text: relName(st.rel[r])}), el("span", {class: "to", lang: "es", text: tg ? tg.title : to})));
+    }
+    if (items.length > n) box.append(el("button", {type: "button", class: "chip", "aria-pressed": "false", onclick: () => draw(n + 100), text: t("moreRefs")(Math.min(100, items.length - n), num(items.length - n))}));
+  };
+  if (items) draw(SHOW);
+  return el("div", {}, el("p", {class: "label", text: `${label} · ${num(total)}`}), box);
+}
+function loadRefs(){
+  if (!st.refsP) st.refsP = fetch("data/refs.json").then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(j => (st.refs = j)).catch(() => { st.refsP = null; st.refs = null; });
+  return st.refsP;
+}
+
+const cap = () => Promise.resolve(null);   // no Claude capabilities outside Claude
+async function excerptFor(l){
+  if (!st.excerpts[l.bucket]) st.excerpts[l.bucket] = fetch(`data/excerpts/${l.bucket}.json`).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).catch(e => { delete st.excerpts[l.bucket]; throw e; });
+  const ex = await st.excerpts[l.bucket];
+  return ex[l.id] || ["", ""];
+}
+
+const setKids = (node, ...kids) => node.replaceChildren(...kids.filter(k => k !== null && k !== undefined && k !== false));
+/* ---------- Subjects and EuroVoc ---------- */
+const EV_SYM = ["=", "≈", "⊂"];
+const evOf = i => st.ev && st.ev.map[i] ? {c: st.ev.concepts[st.ev.map[i][0]], rel: st.ev.map[i][1], tier: st.ev.map[i][2]} : null;
+function subjectsBlock(l){
+  if (!l.subj.length) return null;
+  const box = el("div", {}, el("p", {class: "label", text: st.ev ? t("subjEv") : t("subjects")}));
+  const list = el("div", {style: "display:grid;gap:5px"});
+  l.subjIdx.forEach((si, n) => {
+    const s = l.subj[n], m = evOf(si);
+    const row = el("div", {style: "display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px"},
+      el("button", {type: "button", class: "chip", lang: "es", "aria-pressed": "false", onclick: () => { $("#q").value = s; st.q = s; st.shown = 50; render(); }, text: s}));
+    if (m) {
+      const label = st.lang === "en" && m.c[2] ? m.c[2] : m.c[1];
+      row.append(el("span", {class: "code", title: t("evRel")[m.rel], "aria-label": t("evRel")[m.rel], style: "color:var(--muted)", text: EV_SYM[m.rel]}),
+        el("a", {href: `https://op.europa.eu/${st.lang === "en" ? "en" : "es"}/web/eu-vocabularies/concept/-/resource?uri=http://eurovoc.europa.eu/${m.c[0]}`, target: "_blank", rel: "noopener", lang: st.lang === "en" && m.c[2] ? "en" : "es", text: label}),
+        el("span", {class: "note", style: "margin:0", text: "EuroVoc " + m.c[0] + (m.tier === "reviewed" ? " · " + t("evReviewed") : "")}));
+    }
+    list.append(row);
+  });
+  box.append(list);
+  if (st.ev) box.append(el("p", {class: "note", text: t("evNote")}));
+  return box;
+}
+
+/* ---------- Text and PDF ---------- */
+const idYear = id => (id.match(/^BOE-[A-Z]-(\d{4})-/) || [])[1];
+function pdfLinks(l){
+  const out = [], y = idYear(l.id);
+  if (y && !l.enacted) out.push([t("txtPdf"), `https://www.boe.es/buscar/pdf/${y}/${l.id}-consolidado.pdf`]);
+  if (l.pdfOrig) out.push([t("txtPdfOrig"), l.pdfOrig]);
+  return out;
+}
+function textBlock(l){
+  const box = el("div", {}, el("p", {class: "label", text: t("txtLabel")}));
+  box.append(el("p", {class: "note", style: "margin:0 0 8px"}, el("span", {class: "st " + (l.enacted ? "s2" : "s0"), text: l.enacted ? t("txtEnacted") : t("txtConsol")}), " ", l.enacted ? t("txtEnactedNote") : t("txtConsolNote")));
+  const hi = st.histIndex && st.histIndex[l.id];
+  if (hi && hi.versions > 1) box.append(el("p", {class: "note", style: "margin:0 0 8px"}, t("hPanel")(hi.versions, hi.changes, hi.y0 || "", hi.y1 || "")));
+  box.append(el("div", {class: "chips"},
+    el("button", {type: "button", class: "btn", style: "padding:5px 14px", onclick: () => openReader(l), text: t("txtOpen")})));
+  const links = el("p", {class: "note", style: "margin:8px 0 0"});
+  const items = [...pdfLinks(l), ["BOE (HTML)", `https://www.boe.es/buscar/act.php?id=${l.id}`], ["legalize-es", `https://github.com/legalize-dev/legalize-es/blob/main/${l.path}`]];
+  items.forEach(([name, href], i) => { if (i) links.append(" · "); links.append(el("a", {href, target: "_blank", rel: "noopener", text: name})); });
+  box.append(links);
+  return box;
+}
+const texts = {};
+async function fetchText(l){
+  if (texts[l.id]) return texts[l.id];
+  const urls = [`https://raw.githubusercontent.com/legalize-dev/legalize-es/main/${l.path}`, `https://cdn.jsdelivr.net/gh/legalize-dev/legalize-es@main/${l.path}`];
+  for (const u of urls) {
+    try {
+      const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 15000);
+      const r = await fetch(u, {signal: ctl.signal}); clearTimeout(tm);
+      if (r.ok) { const txt = await r.text(); if (txt.startsWith("---")) return (texts[l.id] = {full: true, md: txt.replace(/^---\n[\s\S]*?\n---\n?/, "")}); }
+    } catch (e) {}
+  }
+  const [head, art1] = await excerptFor(l).catch(() => ["", ""]);
+  return {full: false, md: head + (art1 ? "\n\n" + art1 : "")};
+}
+function renderMd(md, into){ into.replaceChildren(mdFragment(md)); }
+function mdFragment(md){
+  const frag = document.createDocumentFragment();
+  for (const raw of md.split("\n")) {
+    const line = raw.replace(/\\\./g, ".").trim(); if (!line || line.startsWith(">")) continue;
+    const h = line.match(/^(#{1,6})\s*(.*)$/);
+    const textOf = x => x.replace(/\*\*/g, "");
+    if (h) {
+      const lvl = h[1].length, txt = textOf(h[2]);
+      if (/^(Art[ií]culo|Disposici[oó]n)\b/i.test(txt)) frag.append(el("p", {class: "art", "data-art": norm(txt), text: txt}));
+      else frag.append(el(lvl <= 3 ? "h4" : "h5", {text: txt}));
+    } else frag.append(el("p", {text: textOf(line)}));
+  }
+  return frag;
+}
+/* ---------- Article history ---------- */
+const plain = md => md.split("\n").map(x => x.replace(/\\\./g, ".").replace(/^#+\s*/, "").replace(/\*\*/g, "").trim()).filter(x => x && !x.startsWith(">")).join("\n");
+function entryAt(H, unit, date){
+  let cur = null;
+  for (const e of H.units[unit] || []) { if (H.versions[e[0]].d <= date) cur = e; else break; }
+  return cur;
+}
+function wordDiff(a, b){   // a = older, b = newer: line by line first, then word by word inside changed passages
+  const A = a.split("\n"), B = b.split("\n"), n = A.length, m = B.length, frag = document.createDocumentFragment();
+  if (n * m > 4e6) return wordDiffInner(a, b);
+  const L = Array.from({length: n + 1}, () => new Uint16Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = A[i] === B[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  let i = 0, j = 0, oldRun = [], newRun = [];
+  const flush = () => { if (oldRun.length || newRun.length) { frag.append(wordDiffInner(oldRun.join("\n"), newRun.join("\n")), "\n"); oldRun = []; newRun = []; } };
+  while (i < n || j < m) {
+    if (i < n && j < m && A[i] === B[j]) { flush(); frag.append(B[j] + "\n"); i++; j++; }
+    else if (j >= m || (i < n && L[i + 1][j] >= L[i][j + 1])) oldRun.push(A[i++]);
+    else newRun.push(B[j++]);
+  }
+  flush();
+  return frag;
+}
+function wordDiffInner(a, b){
+  const A0 = a.split(/(\s+)/), B0 = b.split(/(\s+)/), frag = document.createDocumentFragment();
+  let pre = 0; while (pre < A0.length && pre < B0.length && A0[pre] === B0[pre]) pre++;          // same start
+  let suf = 0; while (suf < A0.length - pre && suf < B0.length - pre && A0[A0.length - 1 - suf] === B0[B0.length - 1 - suf]) suf++;   // same end
+  const A = A0.slice(pre, A0.length - suf), B = B0.slice(pre, B0.length - suf);
+  if (pre) frag.append(B0.slice(0, pre).join(""));
+  const tail = suf ? B0.slice(B0.length - suf).join("") : "";
+  if (A.length * B.length > 9e6) { if (A.length) frag.append(el("del", {text: A.join("")})); if (B.length) frag.append(el("ins", {text: B.join("")})); if (tail) frag.append(tail); return frag; }
+  const n = A.length, m = B.length, L = Array.from({length: n + 1}, () => new Uint16Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = A[i] === B[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  let i = 0, j = 0; const push = (tag, txt) => { const last = frag.lastChild; if (last && last.nodeName === tag.toUpperCase()) last.textContent += txt; else frag.append(tag === "#" ? document.createTextNode(txt) : el(tag, {text: txt})); };
+  while (i < n && j < m) { if (A[i] === B[j]) { push("#", A[i]); i++; j++; } else if (L[i + 1][j] >= L[i][j + 1]) { push("del", A[i]); i++; } else { push("ins", B[j]); j++; } }
+  while (i < n) push("del", A[i++]); while (j < m) push("ins", B[j++]);
+  if (tail) push("#", tail);
+  return frag;
+}
+function historyBox(H, unit){
+  const box = el("div", {class: "hist"});
+  const entries = H.units[unit];
+  [...entries].reverse().forEach((e, k) => {
+    const idx = entries.length - 1 - k, v = H.versions[e[0]], next = entries[idx + 1] ? H.versions[entries[idx + 1][0]] : null;
+    const row = el("div", {class: "hv"}, el("strong", {text: `${t("hSince")} ${fmt(v.d)}`}), next ? el("span", {text: `${t("hUntil")} ${fmt(next.d)}`}) : null);
+    if (e[1] < 0) row.append(el("em", {text: t("hRemoved")}));
+    if (v.by) { const tg = st.byId.get(v.by); row.append(el("span", {}, t("hBy") + " ", el("a", {href: tg ? "#" + v.by : `https://www.boe.es/buscar/doc.php?id=${v.by}`, target: tg ? null : "_blank", rel: "noopener", onclick: tg ? (ev) => { ev.preventDefault(); closeReader(); select(v.by); } : null, text: tg ? tg.title.slice(0, 70) + (tg.title.length > 70 ? "…" : "") : v.by}))); }
+    else if (idx === 0) row.append(el("span", {text: t("hOrig")}));
+    if (e[1] >= 0) {
+      const holder = el("div", {hidden: ""});
+      row.append(el("button", {type: "button", class: "hbtn", onclick: (ev) => {
+        if (!holder.hidden) { holder.hidden = true; ev.target.textContent = t("hView"); return; }
+        const prev = entries[idx - 1], newer = plain(H.texts[e[1]]);
+        holder.replaceChildren(prev && prev[1] >= 0 ? el("p", {class: "note", style: "margin:4px 0", text: t("hDiff")}) : "", el("div", {class: "old", lang: "es"}, prev && prev[1] >= 0 ? wordDiff(plain(H.texts[prev[1]]), newer) : newer));
+        holder.hidden = false; ev.target.textContent = t("hHide");
+      }, text: t("hView")}));
+      box.append(row, holder);
+    } else box.append(row);
+  });
+  return box;
+}
+function renderHistory(H, date, body){
+  const frag = document.createDocumentFragment();
+  for (const [kind, x] of H.order) {
+    if (kind === "h") { frag.append(el("h4", {text: x})); continue; }
+    const e = entryAt(H, x, date);
+    if (!e || e[1] < 0) continue;
+    const part = mdFragment(H.texts[e[1]]);
+    const n = (H.units[x] || []).length;
+    const head = part.querySelector ? part.querySelector(".art") : null;
+    if (head && n > 1) {
+      const btn = el("button", {type: "button", class: "hbtn", text: t("hBtn")(n)});
+      let open = null;
+      btn.addEventListener("click", () => { if (open) { open.remove(); open = null; return; } open = historyBox(H, x); head.after(open); });
+      head.append(btn);
+    }
+    frag.append(part);
+  }
+  body.replaceChildren(frag);
+}
+let readerEl = null;
+function closeReader(){ if (readerEl) { readerEl.remove(); readerEl = null; document.removeEventListener("keydown", escClose); } }
+const escClose = e => { if (e.key === "Escape") closeReader(); };
+async function openReader(l){
+  closeReader();
+  const body = el("div", {class: "rbody", lang: "es", tabindex: "0"}, el("p", {class: "note", text: t("txtLoading")}));
+  const note = el("div", {class: "rnote", hidden: ""});
+  const artIn = el("input", {type: "text", inputmode: "numeric", placeholder: t("txtArt") + " 37", "aria-label": t("txtArt")});
+  const msg = el("span", {style: "font-size:12px"});
+  const go = () => {
+    const q = artIn.value.trim(); if (!q) return;
+    const key = norm("articulo " + q.replace(/^art(i|í)culo\s*/i, "")).replace(/\s+/g, " ");
+    body.querySelectorAll(".hit").forEach(n => n.classList.remove("hit"));
+    const hit = [...body.querySelectorAll("[data-art]")].find(n => { const a = n.dataset.art.replace(/\s+/g, " "); return a === key || a.startsWith(key + ".") || a.startsWith(key + " "); });
+    if (hit) { hit.classList.add("hit"); hit.scrollIntoView({block: "start"}); msg.textContent = ""; } else msg.textContent = t("txtNoArt");
+  };
+  artIn.addEventListener("keydown", e => { if (e.key === "Enter") go(); });
+  readerEl = el("div", {class: "reader", role: "dialog", "aria-modal": "true", "aria-label": l.title, onclick: e => { if (e.target === readerEl) closeReader(); }},
+    el("div", {class: "sheet"},
+      el("div", {class: "rhead"}, el("strong", {lang: "es", text: l.title}), artIn,
+        el("button", {type: "button", class: "btn", style: "padding:4px 12px", onclick: go, text: t("txtGo")}), msg,
+        el("button", {type: "button", class: "btn", style: "padding:4px 12px", onclick: closeReader, text: t("txtClose")})),
+      note, body));
+  document.body.append(readerEl); document.addEventListener("keydown", escClose); artIn.focus();
+  const H = await loadHistory(l);
+  if (!readerEl) return;
+  if (H) {
+    const today = new Date().toISOString().slice(0, 10);
+    const di = el("input", {type: "date", value: today, min: H.versions[0].d, max: today, "aria-label": t("hAt")});
+    const info = el("span", {class: "note", style: "margin:0"});
+    const show = () => { const d = di.value || today; info.textContent = t("hShowing")(fmt(d), H.versions.length); renderHistory(H, d, body); const q = artIn.value.trim(); if (q) go(); };
+    di.addEventListener("change", show);
+    note.after(el("div", {class: "rtools"}, el("label", {}, t("hAt") + " ", di), el("button", {type: "button", class: "hbtn", onclick: () => { di.value = today; show(); }, text: t("hToday")}), info));
+    note.textContent = `${t("txtSrc")} ${fmt(l.upd)}.`; note.hidden = false;
+    show();
+    return;
+  }
+  const res = await fetchText(l);
+  if (!readerEl) return;
+  note.textContent = (res.full ? `${t("txtSrc")} ${fmt(l.upd)}.` : t("txtFallback")) + (l.enacted ? " " + t("txtEnactedNote") : ""); note.hidden = false;
+  renderMd(res.md, body);
+}
+
+/* ---------- Linked data (ELI) ---------- */
+// The graph for one law = the BOE's own ELI metadata (from legalize-es) + what LKG 2.0 adds:
+// in-force status, hierarchy level, links between laws, EuroVoc matches and, for some laws, article versions.
+const NS = {eli: "http://data.europa.eu/eli/ontology#", skos: "http://www.w3.org/2004/02/skos/core#", xsd: "http://www.w3.org/2001/XMLSchema#", rdfs: "http://www.w3.org/2000/01/rdf-schema#", lkg2: "urn:lkg2:"};
+const ELI_REL = {
+  "MODIFICA": "amends", "SE MODIFICA": "amended_by", "AÑADE": "amends", "SE AÑADE": "amended_by",
+  "DEROGA": "repeals", "SE DEROGA": "repealed_by", "CITA": "cites",
+  "DE CONFORMIDAD CON": "based_on", "SE DICTA DE CONFORMIDAD": "basis_for", "DESARROLLA": "based_on", "SE DESARROLLA": "basis_for",
+  "TRANSPONE": "transposes", "CORRECCIÓN DE ERRORES": "corrects", "CORRECCIÓN DE ERRATAS": "corrects", "SE CORRIGEN ERRORES": "corrected_by"
+};
+const slug = x => norm(x).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+const lawIri = id => { const t = st.byId.get(id); return t && t.eli ? "https://www.boe.es/eli/" + t.eli : "https://www.boe.es/buscar/doc.php?id=" + encodeURIComponent(id); };
+const jurIri = j => j === "es" ? "http://publications.europa.eu/resource/authority/country/ESP" : NS.lkg2 + "jurisdiction:" + j;
+const IN_FORCE = ["InForce-inForce", "InForce-notInForce", "InForce-notInForce", null];
+const FMT_EXT = {"text/html": "html", "application/pdf": "pdf", "application/xml": "xml", "application/epub+zip": "epub"};
+const eliCache = {}, histCache = {};
+async function loadEli(l){
+  if (!(l.bucket[0] in eliCache)) eliCache[l.bucket[0]] = fetch(`data/eli/${l.bucket[0]}.json`).then(r => r.ok ? r.json() : {}).catch(() => ({}));
+  return (await eliCache[l.bucket[0]])[l.id] || null;
+}
+async function loadHistory(l){
+  if (!st.histIndex || !st.histIndex[l.id]) return null;
+  if (!(l.id in histCache)) histCache[l.id] = fetch(`data/history/${l.id}.json`).then(r => r.ok ? r.json() : null).catch(() => null);
+  return histCache[l.id];
+}
+async function ensureLd(l){
+  const jobs = [loadEli(l).then(e => { l._eli = e; }), loadHistory(l).then(h => { l._hist = h; })];
+  if ((l.nPrev || l.nNext) && !st.refs) jobs.push(loadRefs());
+  await Promise.all(jobs);
+}
+
+// triples: [subject, predicate (prefixed), object, kind]  kind: "i" IRI | "s" string | "d" date | "n" integer | "l:xx" language string
+function lawTriples(l){
+  const T = [], add = (s, p, o, k = "i") => { if (o !== null && o !== undefined && o !== "") T.push([s, p, o, k]); };
+  const E = l._eli;
+  let work;
+  if (E) {
+    work = E.work;
+    const X = v => v.startsWith("~") ? work + v.slice(1) : v.startsWith("E:") ? "http://www.elidata.es/mdr/authority/" + v.slice(2)
+      : v.startsWith("M:") ? "https://www.boe.es/legislacion/eli/materias/" + v.slice(2) : v.startsWith("T:") ? "http://www.iana.org/assignments/media-types/" + v.slice(2) : v;
+    const INH = ["jurisdiction", "type_document", "id_local", "date_document", "number", "is_about"];
+    const workNode = E.n["~"] || {};
+    for (const [key, props] of Object.entries(E.n)) {
+      const s = X(key);
+      const all = Object.assign({}, props.inh ? Object.fromEntries(INH.filter(p => workNode[p]).map(p => [p, workNode[p]])) : {}, props);
+      for (const [p, vals] of Object.entries(all)) {
+        if (p === "inh") continue;
+        if (p === "_formats") { for (const f of vals) { if (!f) continue; const ft = X(f), ext = FMT_EXT[ft.split("/media-types/")[1]] || "file", fs = s + "/" + ext;
+          add(fs, "eli:format", ft); add(fs, "eli:embodies", s); add(s, "eli:is_embodied_by", fs); } continue; }
+        for (const [v, k] of vals) {
+          const o = k === "i" ? X(v) : v;
+          add(s, "eli:" + p, o, k);
+          if (p === "is_member_of") add(o, "eli:has_member", s);
+          if (p === "realizes") add(o, "eli:is_realized_by", s);
+        }
+      }
+    }
+  } else {
+    work = lawIri(l.id);   // no official ELI metadata for this law: describe it from the index
+    add(work, "rdf:type", NS.eli + "LegalResource");
+    add(work, "eli:id_local", l.id, "s");
+    add(work, "eli:jurisdiction", jurIri(l.jur));
+    const m = (l.eli || "").match(/\/(\d{4})\/(\d{2})\/(\d{2})\//);
+    add(work, "eli:date_document", l.enact || (m ? `${m[1]}-${m[2]}-${m[3]}` : null), "d");
+    const ex = work + "/spa"; add(work, "eli:is_realized_by", ex); add(ex, "eli:realizes", work);
+    add(ex, "eli:title", l.title, "l:es"); add(ex, "eli:date_publication", l.pub, "d");
+  }
+  add(work, "rdf:type", NS.eli + "LegalResource");
+  // LKG 2.0 additions
+  add(work, "lkg2:normative_level", T_LEVEL_ES[l.level], "l:es");
+  add(work, "lkg2:rank", l.rank, "s");
+  add(work, "eli:first_date_entry_in_force", l.force, "d");
+  if (IN_FORCE[l.status]) add(work, "eli:in_force", NS.eli + IN_FORCE[l.status]);
+  if (l.status !== 0) add(work, "eli:date_no_longer_in_force", l.repeal, "d");
+  add(work, "lkg2:text_state", l.enacted ? "as_enacted" : "consolidated", "s");
+  if (l.dept) { const ag = NS.lkg2 + "agent:" + slug(l.dept); add(work, "eli:passed_by", ag); add(ag, "skos:prefLabel", l.dept, "l:es"); }
+  if (l.arts) add(work, "lkg2:article_count", l.arts, "n");
+  l.subjIdx.forEach((si, n) => {
+    const code = st.subjcode && st.subjcode[si];
+    const sIri = code ? "https://www.boe.es/legislacion/eli/materias/" + code : NS.lkg2 + "materia:" + slug(l.subj[n]);
+    if (!E || !code) add(work, "eli:is_about", sIri);
+    add(sIri, "skos:prefLabel", l.subj[n], "l:es");
+    const m = evOf(si);
+    if (m) { const ev = "http://eurovoc.europa.eu/" + m.c[0]; add(sIri, ["skos:exactMatch", "skos:closeMatch", "skos:broadMatch"][m.rel], ev); if (m.rel === 0) add(work, "eli:is_about", ev); }
+  });
+  const R = st.refs && st.refs[l.id];
+  if (R) for (const side of R) for (const [r, to] of side) {
+    const rel = st.rel[r].replace(/\s+/g, " ").trim();
+    T.push([work, "eli:" + (ELI_REL[rel] || "related_to"), lawIri(to), "i", "BOE: " + rel.toLowerCase()]);
+  }
+  const H = l._hist;
+  if (H) {
+    const members = new Set(T.filter(t => t[1] === "eli:has_member").map(t => t[2]));
+    for (const [unit, entries] of Object.entries(H.units)) {
+      if (unit === "_pre" || unit.startsWith("_")) continue;
+      const a = NS.lkg2 + "unit:" + l.id + "/" + slug(unit);
+      add(a, "rdf:type", NS.eli + "LegalResourceSubdivision"); add(a, "eli:is_part_of", work); add(a, "rdfs:label", unit, "l:es");
+      entries.forEach(([vi, ti], k) => {
+        if (ti < 0) { add(a, "eli:date_no_longer_in_force", H.versions[vi].d, "d"); return; }
+        const v = H.versions[vi], next = entries[k + 1] ? H.versions[entries[k + 1][0]] : null;
+        const av = a + "/" + v.d;
+        add(av, "rdf:type", NS.eli + "LegalResourceSubdivision"); add(a, "eli:has_member", av); add(av, "eli:is_member_of", a);
+        add(av, "eli:version_date", v.d, "d");
+        if (next) add(av, "lkg2:valid_until", next.d, "d");
+        if (v.by) add(av, "lkg2:introduced_by", lawIri(v.by));
+        const con = work + "/con/" + (v.pub || "").replace(/-/g, "");
+        if (members.has(con)) add(av, "eli:is_part_of", con);
+      });
+    }
+  }
+  const seen = new Set();
+  return T.filter(t => { const k = t[0] + "\u0001" + t[1] + "\u0001" + t[2]; if (seen.has(k)) return false; seen.add(k); return true; });
+}
+const T_LEVEL_ES = ["Constitución", "Ley orgánica", "Ley", "Norma con rango de ley", "Reglamento", "Órdenes y otras disposiciones"];
+const PREFIX = Object.entries({rdf: "http://www.w3.org/1999/02/22-rdf-syntax-ns#", ...NS});
+function curie(iri){ for (const [p, ns] of PREFIX) if (iri.startsWith(ns) && /^[A-Za-z0-9_-]+$/.test(iri.slice(ns.length))) return p + ":" + iri.slice(ns.length); return null; }
+
+function toTurtle(l){
+  const T = lawTriples(l);
+  const esc = v => '"' + String(v).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n") + '"';
+  const term = (o, k) => k === "i" ? (o.startsWith("eli:") || o.startsWith("rdf:") ? o : (curie(o) || "<" + o + ">")) : k === "d" ? esc(o) + "^^xsd:date" : k === "n" ? String(o) : k.startsWith("l:") ? esc(o) + "@" + k.slice(2) : esc(o);
+  const subj = s => curie(s) && !s.startsWith(NS.lkg2) ? curie(s) : "<" + s + ">";
+  const by = new Map(); for (const t of T) { if (!by.has(t[0])) by.set(t[0], []); by.get(t[0]).push(t); }
+  const out = PREFIX.map(([p, ns]) => `@prefix ${p}: <${ns}> .`);
+  out.push("", "# BOE ELI metadata (via legalize-es) + LKG 2.0 additions. urn:lkg2: names are provisional.", "");
+  for (const [s, ts] of by) {
+    const lines = ts.map(([, p, o, k, note]) => "    " + (p === "rdf:type" ? "a" : p) + " " + term(o, k) + "\u0000" + (note ? "  # " + note : ""));
+    out.push(subj(s), ...lines.map((x, i) => x.replace("\u0000", i === lines.length - 1 ? " ." : " ;")), "");
+  }
+  return out.join("\n");
+}
+function toJsonLd(l){
+  const T = lawTriples(l), nodes = new Map();
+  for (const [s, p, o, k] of T) {
+    if (!nodes.has(s)) nodes.set(s, {"@id": s});
+    const n = nodes.get(s), key = p === "rdf:type" ? "@type" : p;
+    const val = p === "rdf:type" ? (curie(o) || o) : k === "i" ? {"@id": o} : k === "d" ? {"@value": o, "@type": "xsd:date"} : k === "n" ? {"@value": o, "@type": "xsd:integer"} : k.startsWith("l:") ? {"@value": o, "@language": k.slice(2)} : o;
+    if (n[key] === undefined) n[key] = val; else { if (!Array.isArray(n[key])) n[key] = [n[key]]; n[key].push(val); }
+  }
+  return JSON.stringify({"@context": Object.fromEntries(PREFIX), "@graph": [...nodes.values()]}, null, 1);
+}
+
+let dlP = null;
+const getDownloads = () => dlP || (dlP = Promise.resolve({save: async ({filename, data}) => {
+  const type = filename.endsWith(".ttl") ? "text/turtle" : "application/ld+json";
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([data], {type})); a.download = filename;
+  document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}}));
+function linkedDataBlock(l){
+  const box = el("div", {}, el("p", {class: "label", text: t("ldLabel")}));
+  const row = el("div", {class: "chips"});
+  const view = st.ld && st.ld.id === l.id ? st.ld : null;
+  for (const [fmt, name] of [["json", t("ldJson")], ["ttl", t("ldTtl")]]) {
+    const on = view && view.fmt === fmt;
+    row.append(el("button", {type: "button", class: "chip", "aria-pressed": String(!!on), onclick: async () => {
+      st.ld = on ? null : {id: l.id, fmt}; await ensureLd(l); if (st.sel === l.id) select(l.id, true);
+    }}, `${on ? t("ldHide") : t("ldShow")} ${name}`));
+  }
+  const dl = el("button", {type: "button", class: "chip", "aria-pressed": "false", hidden: "", onclick: async () => {
+    const fmt = view ? view.fmt : "json";
+    try {
+      await ensureLd(l);
+      const d = await getDownloads(); if (!d) throw new Error("unavailable");
+      const data = fmt === "json" ? toJsonLd(l) : toTurtle(l);
+      await d.save({filename: `${l.id}.${fmt === "json" ? "jsonld" : "ttl"}`, data});
+      msg.textContent = t("ldSaved");
+    } catch (e) { if (!(e && e.code === "declined")) msg.textContent = t("ldFail"); }
+  }}, `${t("ldDl")} ${view && view.fmt === "ttl" ? t("ldTtl") : t("ldJson")}`);
+  getDownloads().then(d => { if (d) dl.removeAttribute("hidden"); });
+  row.append(dl);
+  const msg = el("span", {class: "note", style: "margin:0;align-self:center"});
+  row.append(msg);
+  box.append(row);
+  if (view) {
+    const waiting = l._eli === undefined || ((l.nPrev || l.nNext) && !st.refs);
+    box.append(el("pre", {class: "code", style: "white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow:auto;background:rgba(75,114,184,.07);border:1px solid var(--box-edge);padding:8px;margin:8px 0 0;font-size:11px",
+      text: waiting ? t("ldBusy") : (view.fmt === "json" ? toJsonLd(l) : toTurtle(l))}));
+  }
+  box.append(el("p", {class: "note", text: t("ldNote")}));
+  return box;
+}
+
+function select(id, quiet){
+  const l = st.byId && st.byId.get(id); if (!l) return;
+  st.sel = id; try { history.replaceState(null, "", "#" + id.replace(/[^A-Za-z0-9-]/g, "")); } catch (e) {}
+  const p = $("#panel"); setKids(p,
+    el("div", {class: "eyebrow", text: levelName(l.level) + " · " + jurName(l.jur)}),
+    el("h2", {text: l.title, lang: "es"}),
+    el("dl", {},
+      el("dt", {text: t("rank")}), el("dd", {text: RANKNAME(l.rank), lang: "es"}),
+      el("dt", {text: t("validity")}), el("dd", {}, el("span", {class: "st s" + l.status, text: t("status")[l.status]}), l.repeal ? ` ${t("since")} ${fmt(l.repeal)}` : ""),
+      el("dt", {text: t("pub")}), el("dd", {text: fmt(l.pub)}),
+      el("dt", {text: t("force")}), el("dd", {text: fmt(l.force)}),
+      el("dt", {text: t("upd")}), el("dd", {text: fmt(l.upd)}),
+      el("dt", {text: t("dept")}), el("dd", {text: l.dept || "—", lang: "es"}),
+      l.arts ? el("dt", {text: t("arts")}) : null, l.arts ? el("dd", {text: String(l.arts)}) : null,
+      el("dt", {text: t("id")}), el("dd", {class: "code", text: l.id}),
+      el("dt", {text: "ELI"}), el("dd", {}, l.eli ? el("a", {href: "https://www.boe.es/eli/" + l.eli, target: "_blank", rel: "noopener", class: "code", text: "/eli/" + l.eli}) : "—"),
+      ),
+    textBlock(l),
+    linkedDataBlock(l),
+    subjectsBlock(l),
+    refList(st.refs ? (st.refs[id] || [[], []])[0] : null, l.nPrev, t("prev")),
+    refList(st.refs ? (st.refs[id] || [[], []])[1] : null, l.nNext, t("next")));
+  if (!st.refs && (l.nPrev || l.nNext)) loadRefs().then(() => { if (st.refs && st.sel === id) select(id); });
+  if (!quiet) { render(); if (isNarrow() && !$("#list").querySelector(`.row[data-id="${id}"]`)) (PANELBOX || $("#panelbox")).scrollIntoView({block: "start"}); }
+}
+
+document.querySelectorAll(".flags button").forEach(b => b.addEventListener("click", () => {
+  st.lang = b.dataset.lang; try { localStorage.setItem("lkg-lang", st.lang); } catch (e) {} applyLang();
+}));
+document.querySelectorAll(".tab[data-view]").forEach(a => a.addEventListener("click", e => {
+  e.preventDefault(); st.view = a.dataset.view;
+  document.querySelectorAll(".tab[data-view]").forEach(b => b === a ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
+  $("#view-explore").hidden = st.view !== "explore"; $("#view-about").hidden = st.view !== "about";
+}));
+$("#go").addEventListener("click", () => { st.q = $("#q").value.trim(); st.shown = 50; render(); });
+$("#q").addEventListener("input", e => { st.q = e.target.value.trim(); st.shown = 50; render(); });
+$("#jur").addEventListener("change", e => { st.jur = e.target.value; st.shown = 50; render(); });
+$("#sort").addEventListener("change", e => { st.sort = e.target.value; render(); });
+$("#more").addEventListener("click", () => { st.shown += 100; render(); });
+
+window.addEventListener("hashchange", () => { const h = (location.hash || "").slice(1); if (h && st.byId.has(h) && h !== st.sel) select(h); });
+applyLang();
+const histP = fetch("data/history/index.json").then(r => r.ok ? r.json() : null).catch(() => null);
+const evP = fetch("data/eurovoc.json").then(r => r.ok ? r.json() : null).catch(() => null);
+fetch("data/laws.json").then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(async raw => {
+  st.ev = await evP; st.histIndex = await histP;
+  prepare(raw);
+  const h = (location.hash || "").slice(1);
+  if (h && st.byId.has(h)) select(h); else render();
+}).catch(() => { $("#count").textContent = ""; $("#list").replaceChildren(el("div", {class: "empty", text: t("loadFail")})); });
+</script>
+</body>
+</html>
