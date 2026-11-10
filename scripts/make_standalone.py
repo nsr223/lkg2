@@ -29,11 +29,12 @@ s = s.replace('const getDownloads = () => dlP || (dlP = cap("downloads"));',
   '}}));')
 s = s.replace('filename: `${l.id}.${fmt === "json" ? "jsonld.json" : "ttl.txt"}`', 'filename: `${l.id}.${fmt === "json" ? "jsonld" : "ttl"}`')
 # 4. data lives in data/
-for a, b in [('fetch("refs.json")', 'fetch("data/refs.json")'), ('fetch(`eli/', 'fetch(`data/eli/'), ('fetch(`history/', 'fetch(`data/history/'),
-             ('fetch("history/index.json")', 'fetch("data/history/index.json")'), ('fetch("eurovoc.json")', 'fetch("data/eurovoc.json")'),
+for a, b in [('fetch("refs.json")', 'fetch("data/refs.json")'), ('fetch(`eli/', 'fetch(`data/eli/'), ('fetch(`hist/', 'fetch(`data/hist/'),
+             ('fetch("hist/index.json")', 'fetch("data/hist/index.json")'), ('fetch("eurovoc.json")', 'fetch("data/eurovoc.json")'),
              ('fetch("laws.json")', 'fetch("data/laws.json")'), ('fetch(`excerpts/', 'fetch(`data/excerpts/')]:
     assert a in s, a
     s = s.replace(a, b)
+s = s.replace('const HIST_EXT = ".b64.txt";', 'const HIST_EXT = ".json.gz";')
 # 5. footer: link the code
 s = s.replace('<span id="built"></span>.</p>', '<span id="built"></span>. <a href="https://github.com/nsr223/lkg2" target="_blank" rel="noopener">GitHub</a>.</p>')
 assert "sample" not in re.sub(r"//.*", "", s.split("<script>")[1]).replace("example", ""), "summary code left"

@@ -667,14 +667,24 @@ const jurIri = j => j === "es" ? "http://publications.europa.eu/resource/authori
 const IN_FORCE = ["InForce-inForce", "InForce-notInForce", "InForce-notInForce", null];
 const FMT_EXT = {"text/html": "html", "application/pdf": "pdf", "application/xml": "xml", "application/epub+zip": "epub"};
 const eliCache = {}, histCache = {};
+const HIST_EXT = ".json.gz";
 async function loadEli(l){
   if (!(l.bucket[0] in eliCache)) eliCache[l.bucket[0]] = fetch(`data/eli/${l.bucket[0]}.json`).then(r => r.ok ? r.json() : {}).catch(() => ({}));
   return (await eliCache[l.bucket[0]])[l.id] || null;
 }
 async function loadHistory(l){
   if (!st.histIndex || !st.histIndex[l.id]) return null;
-  if (!(l.id in histCache)) histCache[l.id] = fetch(`data/history/${l.id}.json`).then(r => r.ok ? r.json() : null).catch(() => null);
-  return histCache[l.id];
+  const k = l.bucket[0];   // histories are packed in 16 gzip files
+  if (!(k in histCache)) histCache[k] = fetch(`data/hist/${k}${HIST_EXT}`).then(async r => {
+    if (!r.ok) return {};
+    let raw = await r.arrayBuffer();
+    if (HIST_EXT.endsWith(".b64.txt")) raw = Uint8Array.from(atob(new TextDecoder().decode(raw)), c => c.charCodeAt(0)).buffer;   // Claude pages can't serve .gz, so it is stored as base64 text
+    const head = new Uint8Array(raw.slice(0, 2));
+    if (head[0] === 0x1f && head[1] === 0x8b && typeof DecompressionStream !== "undefined")   // still compressed: unzip in the browser
+      return JSON.parse(await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream("gzip"))).text());
+    return JSON.parse(new TextDecoder().decode(raw));   // the server already unzipped it
+  }).catch(() => ({}));
+  return (await histCache[k])[l.id] || null;
 }
 async function ensureLd(l){
   const jobs = [loadEli(l).then(e => { l._eli = e; }), loadHistory(l).then(h => { l._hist = h; })];
@@ -875,7 +885,7 @@ $("#more").addEventListener("click", () => { st.shown += 100; render(); });
 
 window.addEventListener("hashchange", () => { const h = (location.hash || "").slice(1); if (h && st.byId.has(h) && h !== st.sel) select(h); });
 applyLang();
-const histP = fetch("data/history/index.json").then(r => r.ok ? r.json() : null).catch(() => null);
+const histP = fetch("data/hist/index.json").then(r => r.ok ? r.json() : null).catch(() => null);
 const evP = fetch("data/eurovoc.json").then(r => r.ok ? r.json() : null).catch(() => null);
 fetch("data/laws.json").then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(async raw => {
   st.ev = await evP; st.histIndex = await histP;

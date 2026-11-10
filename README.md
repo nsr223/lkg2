@@ -14,7 +14,7 @@ hierarchy of legal norms, linked to each other and described as ELI linked data.
 - **Hierarchy of norms**: Constitution → organic law → law → decrees with the force of law → regulations → orders and other provisions, with counts and filters; status (in force, repealed, expired) and jurisdiction (national or each region).
 - **Each law**: rank, dates, status, issuing body, ELI identifier, consolidated or original text, PDFs (consolidated and original BOE issue), and its **links to other laws** (cites, amends, repeals, amended by, repealed by, …; about 144,000 links).
 - **Full text** with a jump to any article.
-- **Article-by-article history** for consolidated laws: read a law as it stood on any date, see every version of an article with the reform that introduced it, and the words each reform changed.
+- **Article-by-article history** (so far for the 1,236 national law-level norms in force, about 7,200 versions): read a law as it stood on any date, see every version of an article with the reform that introduced it, and the words each reform changed.
 - **EuroVoc**: BOE subjects linked to EuroVoc concepts (about 1,550 subjects, 77% of subject uses; = same, ≈ close, ⊂ broader).
 - **Linked data** for each law (JSON-LD and Turtle): the BOE's own ELI metadata plus what LKG 2.0 adds (status, hierarchy level, links between laws, EuroVoc, article versions).
 - Spanish and English interface.
@@ -38,7 +38,7 @@ data/laws.json             one row per law (compact: repeated strings are stored
 data/refs.json             all links between laws
 data/eurovoc.json          BOE subject → EuroVoc concept
 data/eli/*.json            the BOE's official ELI metadata, 16 files
-data/history/*.json        article-by-article versions, one file per law (+ index.json)
+data/hist/*.json.gz        article-by-article versions, packed in 16 gzip files (+ index.json)
 scripts/                   everything needed to rebuild data/ from legalize-es and EuroVoc
 ```
 
@@ -52,7 +52,8 @@ python3 scripts/build_index.py  legalize-es data          # laws.json, refs.json
 python3 scripts/eli_extract.py  legalize-es data          # eli/
 python3 scripts/eurovoc_parse.py eurovoc_in_skos_core_concepts.rdf eurovoc_min.json
 python3 scripts/eurovoc_map.py  eurovoc_min.json data/laws.json data/eurovoc.json scripts/eurovoc_reviewed.tsv
-python3 scripts/article_history.py legalize-hist data/laws.json data BOE-A-2015-11430 ...   # or @file-with-ids
+python3 scripts/article_history.py legalize-hist data/laws.json work BOE-A-2015-11430 ...   # or @file-with-ids
+python3 scripts/history_pack.py data/laws.json work/history data/hist
 ```
 
 `scripts/eurovoc_candidates.py` lists EuroVoc candidates for unmatched subjects, to review by hand.

@@ -41,12 +41,16 @@ index = json.load(open(ixf)) if os.path.exists(ixf) else {}
 if ids and ids[0].startswith("@"): ids = open(ids[0][1:]).read().split()   # @file = read the IDs from a file
 def build(lid):
     l = laws[lid]; path = f"{jur[l[3]]}/{l[16]}/{lid}.md"
-    log = git("log", "--reverse", "--format=%H%x1f%ad%x1f%B%x1e", "--date=short", "--", path)
+    log = git("log", "--reverse", "--follow", "--format=%H%x1f%ad%x1f%B%x1e", "--date=short", "--", path)
     commits = [c.strip("\n").split("\x1f") for c in log.split("\x1e") if c.strip()]
     versions, texts, tix, units, last = [], [], {}, {}, {}
     order_latest = []
     for n, (h, date, body) in enumerate(commits):
-        md = git("show", f"{h}:{path}")
+        try: md = git("show", f"{h}:{path}")
+        except subprocess.CalledProcessError:   # the file was in another folder at that time
+            other = [x for x in git("ls-tree", "-r", "--name-only", h).split() if x.endswith("/" + lid + ".md")]
+            if not other: continue
+            md = git("show", f"{h}:{other[0]}")
         blocks = split_units(md)
         v = {"d": FIELD(body, "Effective-Date") or date, "pub": FIELD(body, "Source-Date") or date, "by": FIELD(body, "Source-Id") or FIELD(body, "Disposition"), "c": h[:10]}
         if body.startswith("[bootstrap]"): v["by"] = None
