@@ -5,7 +5,7 @@ import glob, gzip, json, os, sys
 laws = {l[0]: l for l in json.load(open(sys.argv[1]))["laws"]}
 src, out = sys.argv[2], sys.argv[3]; os.makedirs(out, exist_ok=True)
 packs = {}
-for f in glob.glob(os.path.join(src, "BOE-*.json")):
+for f in (f for f in glob.glob(os.path.join(src, "*.json")) if not f.endswith("index.json")):
     lid = os.path.basename(f)[:-5]
     packs.setdefault(laws[lid][16][0], {})[lid] = json.load(open(f))
 total = 0
