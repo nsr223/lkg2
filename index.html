@@ -175,7 +175,7 @@ dt{color:var(--muted)} dd{margin:0;overflow-wrap:anywhere}
         <button class="btn" id="go" type="button" data-t="searchBtn"></button>
       </div>
       <select id="jur"><option value="" data-t="allJur"></option></select>
-      <select id="sort"><option value="new" data-t="sortNew"></option><option value="old" data-t="sortOld"></option><option value="rank" data-t="sortRank"></option></select>
+      <select id="sort"><option value="best" data-t="sortBest"></option><option value="new" data-t="sortNew"></option><option value="old" data-t="sortOld"></option><option value="rank" data-t="sortRank"></option></select>
       <div class="flags" role="group" aria-label="Idioma / Language">
         <button type="button" data-lang="es" lang="es" aria-label="Español"><svg viewBox="0 0 26 16" aria-hidden="true"><rect width="26" height="16" fill="#AA151B"/><rect y="4" width="26" height="8" fill="#F1BF00"/></svg></button>
         <button type="button" data-lang="en" lang="en" aria-label="English"><svg viewBox="0 0 60 30" aria-hidden="true"><clipPath id="uk"><path d="M0 0v30h60V0z"/></clipPath><g clip-path="url(#uk)"><path d="M0 0v30h60V0z" fill="#012169"/><path d="M0 0l60 30m0-30L0 30" stroke="#fff" stroke-width="6"/><path d="M0 0l60 30m0-30L0 30" stroke="#C8102E" stroke-width="2.5"/><path d="M30 0v30M0 15h60" stroke="#fff" stroke-width="10"/><path d="M30 0v30M0 15h60" stroke="#C8102E" stroke-width="6"/></g></svg></button>
@@ -247,7 +247,7 @@ const T = {
     aboutAi: "Los resúmenes se generan con IA a petición, a partir del título, los metadatos y el comienzo del texto de cada norma (preámbulo y artículo 1). Una vez generado, el resumen se guarda y lo ven todos los visitantes. Son orientativos y no sustituyen al texto oficial.",
     lede: "Toda la legislación consolidada del BOE en legalize-es, ordenada por jerarquía normativa. Busca una norma, filtra por rango, ámbito y vigencia, y sigue sus referencias a otras normas.",
     search: "Busca por título, número o materia (p. ej. «Estatuto de los Trabajadores», «2/2015», «Despidos»)", searchLabel: "Buscar normas",
-    jurLabel: "Ámbito", allJur: "Todos los ámbitos", sortLabel: "Orden", sortNew: "Más recientes primero", sortOld: "Más antiguas primero", sortRank: "Por jerarquía",
+    jurLabel: "Ámbito", allJur: "Todos los ámbitos", sortLabel: "Orden", sortBest: "Más relevantes", sortNew: "Más recientes primero", sortOld: "Más antiguas primero", sortRank: "Por jerarquía",
     hier: "Jerarquía normativa", hierNote: "De arriba abajo: cada nivel debe respetar a los superiores. Pulsa un nivel para filtrar.", validity: "Vigencia", results: "Resultados",
     loadingIndex: "Cargando el índice de normas…", loadingList: "Cargando unas 26.000 normas de legalize-es…", loadFail: "No se pudo cargar el índice de normas. Recarga la página.",
     count: n => `${n} normas`, countQ: q => ` para «${q}»`, none: "Ninguna norma coincide. Prueba con menos palabras o quita algún filtro.", more: n => `Mostrar más (${n} restantes)`,
@@ -289,7 +289,7 @@ const T = {
     aboutAi: "Summaries are written by AI on request, from each law's title, metadata and the start of its text (preamble and article 1). Once written, a summary is saved and shown to every visitor. They are a guide only and do not replace the official text.",
     lede: "All consolidated Spanish legislation from the BOE (Official State Gazette), via legalize-es, ordered by the hierarchy of legal norms. Search for a law, filter by rank, jurisdiction and status, and follow its references to other laws. Law titles stay in Spanish.",
     search: "Search by title, number or subject (e.g. “Estatuto de los Trabajadores”, “2/2015”, “Despidos”)", searchLabel: "Search laws",
-    jurLabel: "Jurisdiction", allJur: "All jurisdictions", sortLabel: "Order", sortNew: "Newest first", sortOld: "Oldest first", sortRank: "By hierarchy",
+    jurLabel: "Jurisdiction", allJur: "All jurisdictions", sortLabel: "Order", sortBest: "Best match", sortNew: "Newest first", sortOld: "Oldest first", sortRank: "By hierarchy",
     hier: "Hierarchy of norms", hierNote: "Top to bottom: each level must respect the levels above it. Click a level to filter.", validity: "Status", results: "Results",
     loadingIndex: "Loading the law index…", loadingList: "Loading about 26,000 laws from legalize-es…", loadFail: "The law index could not be loaded. Please reload the page.",
     count: n => `${n} laws`, countQ: q => ` for “${q}”`, none: "No law matches. Try fewer words or remove a filter.", more: n => `Show more (${n} left)`,
@@ -313,7 +313,7 @@ const JUR = {"es-an":"Andalucía","es-ar":"Aragón","es-as":"Asturias","es-cb":"
 const RANKNAME = r => r.replace(/_/g, " ").replace(/^./, c => c.toUpperCase());
 const $ = s => document.querySelector(s);
 const norm = s => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-const st = {ld: null, view: "explore", sums: {}, sumBusy: null, excerpts: {}, lang: "es", refs: null, refsP: null, data: null, byId: new Map(), level: null, status: new Set([0]), shown: 50, sel: null, q: "", jur: "", sort: "new"};
+const st = {ld: null, view: "explore", sums: {}, sumBusy: null, excerpts: {}, lang: "es", refs: null, refsP: null, data: null, byId: new Map(), level: null, status: new Set([0]), shown: 50, sel: null, q: "", jur: "", sort: "best"};
 try { const s = localStorage.getItem("lkg-lang"); st.lang = s === "en" || s === "es" ? s : ((navigator.language || "es").toLowerCase().startsWith("es") ? "es" : "en"); } catch (e) {}
 const t = k => T[st.lang][k];
 const num = n => n.toLocaleString(t("locale"));
@@ -396,8 +396,31 @@ function rowFor(l){
         el("span", {text: fmt(l.pub)}), el("span", {class: "st s" + l.status, text: t("status")[l.status]}))));
 }
 
+// Best match: the searched words in the title count most (the whole phrase, at the start, or the law's number),
+// then how important the law is (laws that many later laws refer to, in force, consolidated), so that searching
+// "Estatuto de los Trabajadores" shows the Estatuto itself before the laws that amend it. Without a search: newest first.
+function relevance(l, phrase, words){
+  const t = norm(l.title + " " + (l.num || "")); let s = 0;
+  if (l.num && norm(l.num) === phrase) s += 300;
+  if (norm(l.id) === phrase) s += 300;
+  if (t.includes(phrase)) s += 100;
+  if (words.every(w => t.includes(w))) s += 40;
+  const name = norm(l.title).replace(/^[^,]*?\d{4},\s*/, "").replace(/^(por (el|la) que se aprueba(n)? )?(el |la )?(texto refundido de )?(la )?(ley (organica )?)?(general )?(de la |del |de |sobre )?/, "");
+  if (name.startsWith(phrase)) s += 150;   // the law's own name, e.g. "Ley 1/2000, de 7 de enero, de Enjuiciamiento Civil"
+  if (new RegExp("(^|[^a-z0-9])" + phrase.replace(/[.*+?^${}()|[\]\\\/]/g, "\\$&") + "([^a-z0-9]|$)").test(t)) s += 40;   // whole words, so "constitucion" is not "constitucional"
+  s += 15 * Math.log2(1 + (l.nNext || 0));
+  if (l.status === 0) s += 20;
+  if (!l.enacted) s += 10;
+  return s - t.length / 60;
+}
 function sorted(arr){
   const by = st.sort;
+  if (by === "best") {
+    const phrase = norm(st.q).trim().replace(/\s+/g, " ");
+    if (!phrase) return arr.sort((a, b) => (b.pub || "").localeCompare(a.pub || ""));
+    const words = phrase.split(" "); const sc = new Map(arr.map(l => [l, relevance(l, phrase, words)]));
+    return arr.sort((a, b) => sc.get(b) - sc.get(a) || (b.pub || "").localeCompare(a.pub || ""));
+  }
   return arr.sort((a, b) => by === "rank" ? (a.level - b.level) || (b.pub || "").localeCompare(a.pub || "") :
     by === "old" ? (a.pub || "9").localeCompare(b.pub || "9") : (b.pub || "").localeCompare(a.pub || ""));
 }

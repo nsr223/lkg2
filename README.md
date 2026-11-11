@@ -12,9 +12,9 @@ hierarchy of legal norms, linked to each other and described as ELI linked data.
 
 - **Search** by title, number or subject, accent-insensitive; also in English through EuroVoc labels.
 - **Hierarchy of norms**: Constitution → organic law → law → decrees with the force of law → regulations → orders and other provisions, with counts and filters; status (in force, repealed, expired) and jurisdiction (national or each region).
-- **Each law**: rank, dates, status, issuing body, ELI identifier, consolidated or original text, PDFs (consolidated and original BOE issue), and its **links to other laws** (cites, amends, repeals, amended by, repealed by, …; about 144,000 links).
+- **Each law**: rank, dates, status, issuing body, ELI identifier, consolidated or original text, PDFs (consolidated and original BOE issue), and its **links to other laws** (cites, amends, repeals, amended by, repealed by, …; about 146,000 links).
 - **Full text** with a jump to any article.
-- **Article-by-article history** (so far for 4,750 of the 12,432 consolidated laws: 4,220 national and 530 regional, about 17,800 versions; the rest are being added): read a law as it stood on any date, see every version of an article with the reform that introduced it, and the words each reform changed.
+- **Article-by-article history** (so far for 4,761 of the 12,443 consolidated laws: 4,231 national and 530 regional, about 18,300 versions; the rest are being added): read a law as it stood on any date, see every version of an article with the reform that introduced it, and the words each reform changed.
 - **EuroVoc**: BOE subjects linked to EuroVoc concepts (about 1,550 subjects, 77% of subject uses; = same, ≈ close, ⊂ broader).
 - **Linked data** for each law (JSON-LD and Turtle): the BOE's own ELI metadata plus what LKG 2.0 adds (status, hierarchy level, links between laws, EuroVoc, article versions).
 - Spanish and English interface.
@@ -27,7 +27,7 @@ hierarchy of legal norms, linked to each other and described as ELI linked data.
 | Official ELI metadata | The `eli_metadata` field of each legalize-es file (published by the BOE) | Kept without loss; repetition removed (see `scripts/eli_extract.py`). |
 | EuroVoc | [EuroVoc](https://op.europa.eu/en/web/eu-vocabularies/dataset/-/resource?uri=http://publications.europa.eu/resource/dataset/eurovoc), EU Publications Office (`eurovoc_in_skos_core_concepts`) | © European Union. Matches made automatically from labels, plus reviewed matches for the most-used subjects (`scripts/eurovoc_reviewed.tsv`). |
 
-About the texts: 12,432 laws have a **consolidated** text (amendments built in, so they have a version history);
+About the texts: 12,443 laws have a **consolidated** text (amendments built in, so they have a version history);
 13,505 have the **original** text only (their amendments are separate laws).
 
 ## Files

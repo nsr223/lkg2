@@ -1,6 +1,9 @@
 """Build a compact metadata index of legalize-es for the law explorer page.
 
-Usage: python3 -I build_index.py <legalize-es checkout> <out dir>
+Usage: python3 -I build_index.py <legalize-es checkout> <out dir> [previous laws.json]
+
+With a previous laws.json, strings already in its "dict" keep their numbers (new ones are added at
+the end), so files that refer to those numbers (eurovoc.json) stay valid.
 
 Writes laws.json (one row per law), refs.json (all links between laws, loaded
 by the page only when a law is opened) and excerpts/<folder>.json (the start
@@ -38,6 +41,10 @@ def refs(s):
     return outl
 
 dicts = {k: {} for k in ("rank", "dept", "subj", "rel", "jur")}
+if len(sys.argv) > 3:
+    for k, arr in json.load(open(sys.argv[3], encoding="utf-8"))["dict"].items():
+        if k in dicts:
+            dicts[k] = {x: i for i, x in enumerate(arr)}
 def idx(kind, s):
     d = dicts[kind]
     if s not in d:
@@ -72,6 +79,10 @@ def excerpt(body):
 for path in glob.glob(os.path.join(root, "es*", "**", "*.md"), recursive=True):
     with open(path, encoding="utf-8") as f:
         head = f.read(400_000)
+        while head.startswith("---\n") and "\n---" not in head[4:]:   # a few laws have front matter longer than 400,000 characters
+            more = f.read(400_000)
+            if not more: break
+            head += more
     m = FM.match(head)
     if not m:
         skipped += 1
