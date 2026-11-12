@@ -14,7 +14,7 @@ hierarchy of legal norms, linked to each other and described as ELI linked data.
 - **Hierarchy of norms**: Constitution → organic law → law → decrees with the force of law → regulations → orders and other provisions, with counts and filters; status (in force, repealed, expired) and jurisdiction (national or each region).
 - **Each law**: rank, dates, status, issuing body, ELI identifier, consolidated or original text, PDFs (consolidated and original BOE issue), and its **links to other laws** (cites, amends, repeals, amended by, repealed by, …; about 146,000 links).
 - **Full text** with a jump to any article.
-- **Article-by-article history** (so far for 10,918 of the 12,443 consolidated laws: 8,823 national and 2,095 regional, about 37,700 versions; the rest are being added): read a law as it stood on any date, see every version of an article with the reform that introduced it, and the words each reform changed.
+- **Article-by-article history** (for all 12,443 consolidated laws: 8,823 national and 3,620 regional, about 44,800 versions): read a law as it stood on any date, see every version of an article with the reform that introduced it, and the words each reform changed.
 - **EuroVoc**: BOE subjects linked to EuroVoc concepts (about 1,550 subjects, 77% of subject uses; = same, ≈ close, ⊂ broader).
 - **Linked data** for each law (JSON-LD and Turtle): the BOE's own ELI metadata plus what LKG 2.0 adds (status, hierarchy level, links between laws, EuroVoc, article versions).
 - Spanish and English interface.
