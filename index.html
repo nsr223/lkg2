@@ -143,6 +143,24 @@ dt{color:var(--muted)} dd{margin:0;overflow-wrap:anywhere}
 .hist .old{font:13.5px/1.6 var(--f-head);margin:6px 0 8px;padding:8px;background:var(--sheet);border:1px solid var(--box-edge);white-space:pre-wrap}
 .hist del{background:rgba(217,58,43,.18);text-decoration:line-through}
 .hist ins{background:rgba(44,110,73,.22);text-decoration:none}
+.qa-status{font:12.5px var(--f-ui);border-left:4px solid var(--box-head);background:rgba(75,114,184,.07);padding:7px 10px}
+.qa-status.off{border-left-color:var(--red)}
+.qa-status code{font:12px var(--f-code)}
+.qa-ask{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end;max-width:760px}
+.qa-ask textarea{width:100%;box-sizing:border-box;font:14px/1.5 var(--f-ui);padding:7px 9px;border:1px solid #9AA3B2;background:var(--sheet);color:var(--ink);resize:vertical}
+@media (max-width:600px){.qa-ask{grid-template-columns:1fr}}
+.qa-card{border:1px solid var(--box-edge);margin:14px 0;max-width:760px}
+.qa-card .qq{font:bold 13.5px/1.4 var(--f-ui);color:var(--head);padding:8px 12px;border-bottom:1px solid var(--box-edge);background:rgba(75,114,184,.06)}
+.qa-card .qa{font:13.5px/1.6 var(--f-ui);padding:10px 12px;white-space:pre-wrap;overflow-wrap:anywhere}
+.qa-card .qa.err{color:var(--red)}
+.qa-card .qm{font:11.5px var(--f-ui);color:var(--muted);padding:0 12px 8px}
+.qa-card .qr{font:13px/1.5 var(--f-ui);border-top:1px dotted var(--box-edge);padding:8px 12px}
+.qa-demo{padding-left:22px;max-width:760px}
+.qa-demo li{margin:0 0 10px;font-size:13.5px}
+.qa-demo .qd{display:block;font:bold 13.5px/1.4 var(--f-ui);color:var(--link);background:none;border:0;padding:0;text-align:left;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.qa-demo .qd[disabled]{color:var(--head);text-decoration:none;cursor:default}
+.qa-demo .qx{color:var(--muted);font-size:12.5px;margin-top:2px}
+.qsrc a{color:var(--link)}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -162,6 +180,7 @@ dt{color:var(--muted)} dd{margin:0;overflow-wrap:anywhere}
   </div>
   <nav class="strip" aria-label="Secciones">
     <a class="tab" href="#" data-view="explore" data-t="tabExplore" aria-current="page"></a>
+    <a class="tab" href="#" data-view="qa" data-t="tabQa"></a>
     <a class="tab" href="#" data-view="about" data-t="tabAbout"></a>
     <a class="tab" href="https://oeg.fi.upm.es" target="_blank" rel="noopener">OEG</a>
     <a class="tab" href="https://github.com/legalize-dev/legalize-es" target="_blank" rel="noopener">legalize-es</a>
@@ -204,6 +223,22 @@ dt{color:var(--muted)} dd{margin:0;overflow-wrap:anywhere}
     </div>
   </div>
 
+  <div id="view-qa" class="about qa" hidden>
+    <h2 data-t="qaTitle"></h2>
+    <p data-t="qaIntro"></p>
+    <p class="qa-status" id="qaStatus"></p>
+    <div class="qa-ask">
+      <textarea id="qaQ" rows="3"></textarea>
+      <button class="btn" id="qaGo" type="button" data-t="qaAsk"></button>
+    </div>
+    <div id="qaOut"></div>
+    <div id="qaDemoBox" hidden>
+      <h3 data-t="qaDemoTitle"></h3>
+      <p class="note" data-t="qaDemoNote"></p>
+      <ol class="qa-demo" id="qaDemo"></ol>
+    </div>
+  </div>
+
   <div id="view-about" class="about" hidden>
     <h2 data-t="aboutTitle"></h2>
     <p data-t="about1"></p>
@@ -232,7 +267,14 @@ const T = {
     txtLabel: "Texto", txtOpen: "Leer el texto aquí", txtPdf: "PDF consolidado (BOE)", txtPdfOrig: "PDF original (BOE del día)", txtLoading: "Cargando el texto…",
     txtClose: "Cerrar", txtGo: "Ir", txtArt: "Artículo", txtNoArt: "No se encontró ese artículo.", txtSrc: "Texto de legalize-es (fuente: BOE). Versión del",
     txtFallback: "El texto completo no se puede cargar en esta vista. Se muestra el comienzo; el texto entero está en el BOE y en legalize-es.",
-    tabExplore: "Explorador", tabAbout: "Acerca de", searchBtn: "Buscar", lawBox: "Norma",
+    tabExplore: "Explorador", tabAbout: "Acerca de", searchBtn: "Buscar", lawBox: "Norma", tabQa: "Preguntas",
+    qaTitle: "Preguntas sobre la legislación", qaIntro: "Haz una pregunta sobre derecho español. De momento responde un modelo de lenguaje sin consultar el grafo (escenario 1); la recuperación sobre LKG 2.0 llegará después. Las respuestas pueden contener errores: comprueba siempre el texto en el BOE.",
+    qaAsk: "Preguntar", qaBusy: "Pensando…", qaPh: "Escribe tu pregunta (p. ej. «¿Cuánta fianza hay que dar al alquilar una vivienda?»)",
+    qaChecking: "Buscando el servidor de preguntas…", qaOn: (m, p, mode) => `Responde: ${m} (${p}, ${mode === "local" ? "modelo local" : "modelo en la nube"}) · escenario 1: modelo sin recuperación.`,
+    qaOff: "Las preguntas necesitan el servidor de LKG 2.0 en tu ordenador. Instálalo y arráncalo con", qaOff2: "y abre http://localhost:8000. Instrucciones en el README de GitHub.",
+    qaDemoTitle: "Preguntas de ejemplo", qaDemoNote: "Con su respuesta de referencia, comprobada en el texto del BOE. Pulsa una pregunta para hacérsela al modelo.",
+    qaRef: "Respuesta de referencia:", qaSrc: "Fuente:", qaMeta: (m, p, s) => `${m} (${p}) · ${s} s`, qaFail: "No se pudo obtener respuesta.",
+    qaTypes: {fact: "dato", history: "historia", links: "relaciones", regional: "autonómica"},
     sumLabel: "Resumen", sumBtn: "Generar resumen", sumBusy: "Generando resumen…", sumNote: "Resumen generado por IA a partir del inicio del texto oficial. Puede contener errores: consulta siempre el texto en el BOE.",
     sumNone: "Todavía no hay resumen de esta norma.", sumOff: "Los resúmenes con IA solo están disponibles al abrir esta página en Claude.", sumFail: "No se pudo generar el resumen. Inténtalo de nuevo más tarde.", sumRate: "Demasiadas solicitudes seguidas. Espera un momento.",
     aboutTitle: "Acerca del LKG 2.0 Explorer",
@@ -274,7 +316,14 @@ const T = {
     txtLabel: "Text", txtOpen: "Read the text here", txtPdf: "Consolidated PDF (BOE)", txtPdfOrig: "Original PDF (BOE issue)", txtLoading: "Loading the text…",
     txtClose: "Close", txtGo: "Go", txtArt: "Article", txtNoArt: "That article was not found.", txtSrc: "Text from legalize-es (source: BOE). Version of",
     txtFallback: "The full text cannot be loaded in this view. The start is shown below; the whole text is on the BOE and legalize-es.",
-    tabExplore: "Explorer", tabAbout: "About", searchBtn: "Search", lawBox: "Law",
+    tabExplore: "Explorer", tabAbout: "About", searchBtn: "Search", lawBox: "Law", tabQa: "Q&A",
+    qaTitle: "Questions about the legislation", qaIntro: "Ask a question about Spanish law. For now a language model answers without looking anything up in the graph (scenario 1); retrieval over LKG 2.0 comes later. Answers may contain errors: always check the text in the BOE.",
+    qaAsk: "Ask", qaBusy: "Thinking…", qaPh: "Type your question (e.g. “How much deposit must be paid when renting a home?”)",
+    qaChecking: "Looking for the Q&A server…", qaOn: (m, p, mode) => `Answering: ${m} (${p}, ${mode === "local" ? "local model" : "hosted model"}) · scenario 1: model without retrieval.`,
+    qaOff: "Questions need the LKG 2.0 server running on your computer. Install and start it with", qaOff2: "and open http://localhost:8000. Instructions in the GitHub README.",
+    qaDemoTitle: "Example questions", qaDemoNote: "With a reference answer checked against the BOE text. Click a question to ask the model.",
+    qaRef: "Reference answer:", qaSrc: "Source:", qaMeta: (m, p, s) => `${m} (${p}) · ${s} s`, qaFail: "No answer could be obtained.",
+    qaTypes: {fact: "fact", history: "history", links: "links", regional: "regional"},
     sumLabel: "Summary", sumBtn: "Generate summary", sumBusy: "Writing summary…", sumNote: "AI-generated summary based on the start of the official text. It may contain errors: always check the text in the BOE.",
     sumNone: "There is no summary of this law yet.", sumOff: "AI summaries are only available when this page is opened in Claude.", sumFail: "The summary could not be generated. Please try again later.", sumRate: "Too many requests in a row. Please wait a moment.",
     aboutTitle: "About the LKG 2.0 Explorer",
@@ -336,6 +385,7 @@ function applyLang(){
   $("#jur").querySelectorAll("option[value]").forEach(o => { if (o.value) o.textContent = jurName(o.value); });
   if (!st.data) $("#count").textContent = t("loadingIndex");
   if (st.sel) select(st.sel, true); else emptyPanel();
+  if (st.view === "qa") qaRender();
   render();
 }
 function emptyPanel(){ $("#panel").replaceChildren(el("h2", {text: t("pick")}), el("p", {class: "note", style: "margin:0", text: t("pickNote")})); }
@@ -895,11 +945,65 @@ function select(id, quiet){
 document.querySelectorAll(".flags button").forEach(b => b.addEventListener("click", () => {
   st.lang = b.dataset.lang; try { localStorage.setItem("lkg-lang", st.lang); } catch (e) {} applyLang();
 }));
-document.querySelectorAll(".tab[data-view]").forEach(a => a.addEventListener("click", e => {
-  e.preventDefault(); st.view = a.dataset.view;
-  document.querySelectorAll(".tab[data-view]").forEach(b => b === a ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
-  $("#view-explore").hidden = st.view !== "explore"; $("#view-about").hidden = st.view !== "about";
-}));
+function showView(v){
+  st.view = v;
+  document.querySelectorAll(".tab[data-view]").forEach(b => b.dataset.view === v ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
+  for (const x of ["explore", "qa", "about"]) $("#view-" + x).hidden = v !== x;
+  if (v === "qa") qaOpen();
+}
+document.querySelectorAll(".tab[data-view]").forEach(a => a.addEventListener("click", e => { e.preventDefault(); showView(a.dataset.view); }));
+
+/* Q&A tab: talks to the local LKG 2.0 server (server/app.py) at api/qa; on the static site it only lists the demo questions. */
+const qa = {info: undefined, questions: null, log: [], busy: false};
+function qaOpen(){
+  if (qa.info === undefined) {
+    qa.info = null; qaRender();
+    fetch("api/qa").then(r => r.ok ? r.json() : null).then(j => { qa.info = j && j.service === "lkg2-qa" ? j : false; qaRender(); }).catch(() => { qa.info = false; qaRender(); });
+  }
+  if (!qa.questions) fetch("api/questions").then(r => r.ok ? r.json() : null).then(j => { qa.questions = j ? j.questions : []; qaRender(); }).catch(() => { qa.questions = []; qaRender(); });
+}
+function lawLink(id){
+  const l = st.byId.get(id);
+  return el("a", {href: "#" + id, onclick: e => { e.preventDefault(); showView("explore"); if (st.byId.has(id)) select(id); location.hash = id; }}, l ? l.title : id);
+}
+function sourcesLine(srcs){
+  const p = el("div", {class: "qsrc"}, t("qaSrc") + " ");
+  srcs.forEach((s, i) => { if (i) p.append("; "); p.append(lawLink(s.law)); if (s.unit) p.append(", " + s.unit); });
+  return p;
+}
+async function qaAsk(text, demo){
+  text = (text || "").trim(); if (!text || qa.busy || !qa.info) return;
+  const item = {q: text, demo, res: null, err: null}; qa.log.unshift(item); qa.busy = true; qaRender();
+  try {
+    const r = await fetch("api/qa", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({question: text})});
+    const j = await r.json().catch(() => ({}));
+    if (r.ok) item.res = j; else item.err = j.detail || (t("qaFail") + " (" + r.status + ")");
+  } catch (e) { item.err = t("qaFail"); }
+  qa.busy = false; qaRender();
+}
+function qaRender(){
+  const s = $("#qaStatus"); s.className = "qa-status";
+  if (qa.info === null || qa.info === undefined) s.textContent = t("qaChecking");
+  else if (qa.info) s.textContent = t("qaOn")(qa.info.model, qa.info.provider, qa.info.mode);
+  else { s.classList.add("off"); s.replaceChildren(t("qaOff") + " ", el("code", {text: "pip install -r server/requirements.txt && python server/app.py"}), " " + t("qaOff2")); }
+  const off = !qa.info;
+  $("#qaQ").disabled = off; $("#qaQ").placeholder = t("qaPh");
+  $("#qaGo").disabled = off || qa.busy; $("#qaGo").textContent = qa.busy ? t("qaBusy") : t("qaAsk");
+  $("#qaOut").replaceChildren(...qa.log.map(it => {
+    const card = el("div", {class: "qa-card"}, el("div", {class: "qq", text: it.q}));
+    if (it.res) card.append(el("div", {class: "qa", text: it.res.answer}), el("div", {class: "qm", text: t("qaMeta")(it.res.model, it.res.provider, it.res.seconds)}));
+    else if (it.err) card.append(el("div", {class: "qa err", text: it.err}));
+    else card.append(el("div", {class: "qa", text: t("qaBusy")}));
+    if (it.demo) card.append(el("div", {class: "qr"}, el("strong", {text: t("qaRef") + " "}), it.demo["answer_" + st.lang], sourcesLine(it.demo.sources)));
+    return card;
+  }));
+  const demos = qa.questions || []; $("#qaDemoBox").hidden = !demos.length;
+  $("#qaDemo").replaceChildren(...demos.map(q => el("li", {},
+    el("button", {class: "qd", type: "button", disabled: off || qa.busy ? "" : null, onclick: () => { $("#qaQ").value = q[st.lang]; qaAsk(q[st.lang], q); }}, q[st.lang]),
+    el("div", {class: "qx"}, `[${t("qaTypes")[q.type] || q.type}] `, el("strong", {text: t("qaRef") + " "}), q["answer_" + st.lang], sourcesLine(q.sources)))));
+}
+$("#qaGo").addEventListener("click", () => qaAsk($("#qaQ").value, null));
+$("#qaQ").addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) qaAsk($("#qaQ").value, null); });
 $("#go").addEventListener("click", () => { st.q = $("#q").value.trim(); st.shown = 50; render(); });
 $("#q").addEventListener("input", e => { st.q = e.target.value.trim(); st.shown = 50; render(); });
 $("#jur").addEventListener("change", e => { st.jur = e.target.value; st.shown = 50; render(); });
@@ -913,6 +1017,7 @@ const evP = fetch("data/eurovoc.json").then(r => r.ok ? r.json() : null).catch((
 fetch("data/laws.json").then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(async raw => {
   st.ev = await evP; st.histIndex = await histP;
   prepare(raw);
+  if (st.view === "qa") qaRender();
   const h = (location.hash || "").slice(1);
   if (h && st.byId.has(h)) select(h); else render();
 }).catch(() => { $("#count").textContent = ""; $("#list").replaceChildren(el("div", {class: "empty", text: t("loadFail")})); });

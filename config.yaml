@@ -1,0 +1,20 @@
+# Settings for the LKG 2.0 Q&A service (server/app.py).
+# Changes apply to the next question; no restart needed.
+
+# Which model answers: "local" (Ollama on this computer) or "frontier" (a hosted model; needs an API key in .env).
+mode: local
+
+local:
+  model: qwen2.5:7b              # any model pulled with `ollama pull`, e.g. llama3.1:8b, gemma2:9b
+  url: http://localhost:11434
+
+frontier:
+  provider: anthropic            # anthropic, openai or gemini
+  model: claude-sonnet-5-5       # a model name from that provider (e.g. gemini-2.5-flash for gemini)
+
+temperature: 0                   # remove this line if a model rejects it
+timeout: 120                     # seconds to wait for an answer
+port: 8000
+
+# Demo questions for the Q&A tab. Kept out of git (private/ is ignored) so they never become public.
+questions_file: private/questions.json

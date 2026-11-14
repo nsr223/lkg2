@@ -40,7 +40,50 @@ data/eurovoc.json          BOE subject → EuroVoc concept
 data/eli/*.json            the BOE's official ELI metadata, 16 files
 data/hist/*.json.gz        article-by-article versions, packed in 16 gzip files (+ index.json)
 scripts/                   everything needed to rebuild data/ from legalize-es and EuroVoc
+server/                    the local Q&A service (FastAPI): /api/qa, and the page itself
+config.yaml                which model the Q&A service uses
 ```
+
+## Q&A service (runs on your computer)
+
+The **Q&A** tab answers questions about Spanish law through a small local server. On the GitHub Pages site the tab only
+explains how to start it; to ask questions, run the server:
+
+```bash
+pip install -r server/requirements.txt
+python server/app.py              # open http://localhost:8000  (API docs at /docs)
+```
+
+The server listens on `localhost` only. It serves the page and its data (nothing else from the folder) and the API.
+
+**Choosing the model** (`config.yaml`, read on every question, so no restart is needed):
+
+- `mode: local` uses [Ollama](https://ollama.com) on your computer: install it, run `ollama pull qwen2.5:7b`
+  (or `llama3.1:8b`, `gemma2:9b`, …) and set `local.model`.
+- `mode: frontier` uses a hosted model: set `frontier.provider` (`anthropic`, `openai` or `gemini`) and
+  `frontier.model`, and put the API key in a `.env` file (copy `.env.example`). `.env` is ignored by git.
+
+**API**
+
+`GET /api/qa` tells you what the service is set up to use:
+`{"service": "lkg2-qa", "scenario": "plain-llm", "mode": "local", "provider": "ollama", "model": "qwen2.5:7b"}`
+
+`POST /api/qa` with `{"question": "...", "mode": "local"}` (`mode` is optional and overrides `config.yaml`) returns
+`{"question", "answer", "scenario", "mode", "provider", "model", "seconds"}`. Errors return status 503 with a
+`detail` that says what to fix (Ollama not running, model not pulled, missing API key).
+
+`GET /api/questions` returns the demo questions shown in the tab. They are read from `private/questions.json`, which
+git ignores, so they stay off the web and out of future model training data. Ask the authors for the file.
+
+```bash
+curl -X POST http://localhost:8000/api/qa -H 'Content-Type: application/json' \
+     -d '{"question": "¿Cuánta fianza hay que dar al alquilar una vivienda?"}'
+python server/ask_all.py                        # the demo questions; answers saved to answers.jsonl
+python server/ask_all.py --questions path/to/benchmark.jsonl --out path/to/results.jsonl   # any question file
+```
+
+For now the model answers from its own knowledge, without looking anything up (scenario 1, `plain-llm`). Retrieval over
+LKG 2.0 (RAG or MCP, with links to the laws used) is the next scenario.
 
 ## Rebuilding the data
 

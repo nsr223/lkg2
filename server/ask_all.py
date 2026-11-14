@@ -1,0 +1,88 @@
+"""Send a set of questions to the running /api/qa service and save the answers.
+
+Works with the demo questions and with a benchmark file kept elsewhere (for example a
+private repository), so the questions never have to be added to this repository.
+
+    python server/ask_all.py                                    # demo questions in private/questions.json
+    python server/ask_all.py --questions ../legal-qa-benchmark/data/noah/questions1.jsonl \\
+                             --out ../legal-qa-benchmark/results/lkg2_local.jsonl
+
+Input: a .jsonl file with one question per line ("id", "question", optional "variant"),
+or a .json file {"questions": [...]} in the demo format ("id", "es"/"en").
+Output: .jsonl, one answer per line, in the same format as the benchmark's run_models.py
+("model", "model_id", "id", "variant", "answer", ...), so its score.py can read it.
+Already answered items are skipped, so an interrupted run can be resumed.
+Multi-turn items (variant "pressure") are skipped: /api/qa takes one question.
+"""
+import argparse
+import json
+import pathlib
+import sys
+from datetime import datetime, timezone
+
+import httpx
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+p = argparse.ArgumentParser()
+p.add_argument("--questions", default=str(ROOT / "private" / "questions.json"))
+p.add_argument("--url", default="http://localhost:8000")
+p.add_argument("--mode", choices=["local", "frontier"], help="override config.yaml for this run")
+p.add_argument("--lang", choices=["es", "en"], default="es", help="language of demo questions")
+p.add_argument("--label", help='name for this system in the results (default: "lkg2_<mode>")')
+p.add_argument("--out", default="answers.jsonl")
+a = p.parse_args()
+
+path = pathlib.Path(a.questions)
+if not path.exists():
+    sys.exit(f"No question file at {path}")
+if path.suffix == ".jsonl":
+    items = [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
+else:
+    items = json.loads(path.read_text(encoding="utf-8"))["questions"]
+
+try:
+    info = httpx.get(f"{a.url}/api/qa", timeout=10).json()
+except httpx.HTTPError:
+    sys.exit(f"The Q&A server is not running at {a.url}. Start it with: python server/app.py")
+mode = a.mode or info["mode"]
+label = a.label or f"lkg2_{mode}"
+
+out = pathlib.Path(a.out)
+done = set()
+if out.exists():
+    for l in out.read_text(encoding="utf-8").splitlines():
+        r = json.loads(l)
+        if r.get("answer"):
+            done.add((r["model"], r["id"], r["variant"]))
+
+n = skipped = 0
+for x in items:
+    variant = x.get("variant", "plain")
+    if variant == "pressure":
+        skipped += 1
+        continue
+    if (label, x["id"], variant) in done:
+        continue
+    question = x.get("question") or x.get(a.lang)
+    rec = {"model": label, "id": x["id"], "variant": variant, "prompt_file": "lkg2-plain-llm",
+           "prompt": question, "date": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+    body = {"question": question, "mode": mode}
+    try:
+        r = httpx.post(f"{a.url}/api/qa", json=body, timeout=900)
+        j = r.json()
+        if r.status_code == 200:
+            rec.update(provider=j["provider"], model_id=j["model"], scenario=j["scenario"], mode=j["mode"],
+                       answer=j["answer"], seconds=j["seconds"])
+        else:
+            rec.update(answer="", error=j.get("detail", r.text))
+    except httpx.HTTPError as e:
+        rec.update(answer="", error=str(e))
+    with open(out, "a", encoding="utf-8") as f:
+        f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    n += 1
+    print(f"  {x['id']} {variant}: {rec.get('seconds', '-')} s  {(rec['answer'] or 'ERROR ' + rec.get('error', ''))[:80]!r}")
+    if rec.get("error") and ("API key" in rec["error"] or "Could not reach" in rec["error"]):
+        sys.exit("Stopping: fix the problem above and run again to continue.")
+
+print(f"Saved {n} answers to {out}" + (f" (skipped {skipped} multi-turn items)" if skipped else ""))
