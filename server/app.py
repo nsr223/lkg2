@@ -134,8 +134,8 @@ def qa(q: Question):
             blocks = []
             for s in sources:
                 head = s["title"] + (f" — {s['unit']}" if s["unit"] else " — ficha de la norma (LKG 2.0)")
-                if s.get("since"):
-                    head += f" (versión vigente desde {s['since']})"
+                info = [f"ámbito: {s['where']}", s["status"]] + ([f"versión vigente desde {s['since']}"] if s.get("since") else [])
+                head += " (" + "; ".join(info) + ")"
                 blocks.append(f"[{s['n']}] {head}\n{s['text']}")
             prompt = "Fragmentos:\n\n" + "\n\n".join(blocks) + f"\n\nPregunta: {question}"
             answer, provider, model = llm.ask(config, prompt, mode, system=config.get("rag_prompt") or llm.RAG_PROMPT)

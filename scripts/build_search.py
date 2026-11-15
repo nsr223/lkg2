@@ -89,7 +89,8 @@ def main():
         r = rows[law_id]
         cur = db.execute("INSERT INTO units(law, unit, context, since, text) VALUES (?,?,?,?,?)",
                          (law_id, unit, ctx, since, zlib.compress(t.encode("utf-8"), 6)))
-        name = f"{r[1]} {r[11] or ''} {ctx} {unit}"
+        first = t.split("\n", 1)[0][:200]   # the unit's own heading, e.g. "Artículo 36. Fianza."
+        name = f"{r[1]} {r[11] or ''} {ctx} {first if first.startswith(unit) else unit}"
         db.execute("INSERT INTO fts(rowid, name, text) VALUES (?,?,?)", (cur.lastrowid, name, t))
         n_units += 1
 

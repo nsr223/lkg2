@@ -87,7 +87,7 @@ for x in items:
     with open(out, "a", encoding="utf-8") as f:
         f.write(json.dumps(rec, ensure_ascii=False) + "\n")
     n += 1
-    print(f"  {x['id']} {variant}: {rec.get('seconds', '-')} s  {(rec['answer'] or 'ERROR ' + rec.get('error', ''))[:80]!r}")
+    print(f"  {x['id']} [{scenario}]: {rec.get('seconds', '-')} s  {(rec['answer'] or 'ERROR ' + rec.get('error', ''))[:80]!r}")
     if rec.get("error") and ("API key" in rec["error"] or "Could not reach" in rec["error"]):
         sys.exit("Stopping: fix the problem above and run again to continue.")
 

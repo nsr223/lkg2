@@ -58,6 +58,11 @@ REGIONS = {"andalucia": "es-an", "aragon": "es-ar", "asturias": "es-as", "cantab
            "extremadura": "es-ex", "galicia": "es-ga", "baleares": "es-ib", "illes balears": "es-ib", "murcia": "es-mc",
            "madrid": "es-md", "navarra": "es-nc", "pais vasco": "es-pv", "euskadi": "es-pv", "la rioja": "es-ri",
            "valenciana": "es-vc", "valencia": "es-vc", "ceuta": "es-ce", "melilla": "es-ml"}
+JUR_NAMES = {"es": "estatal", "es-an": "Andalucía", "es-ar": "Aragón", "es-as": "Asturias", "es-cb": "Cantabria",
+             "es-cl": "Castilla y León", "es-cm": "Castilla-La Mancha", "es-cn": "Canarias", "es-ct": "Cataluña",
+             "es-ex": "Extremadura", "es-ga": "Galicia", "es-ib": "Illes Balears", "es-mc": "Región de Murcia",
+             "es-md": "Comunidad de Madrid", "es-nc": "Navarra", "es-pv": "País Vasco", "es-ri": "La Rioja",
+             "es-vc": "Comunitat Valenciana", "es-ce": "Ceuta", "es-ml": "Melilla"}
 STATUS_ES = {0: "vigente", 1: "derogada", 2: "sin efecto (expirada)"}
 REL_SHOW = {"SE DEROGA": "derogada por", "SE MODIFICA": "modificada por", "DEROGA": "deroga", "SE DESARROLLA": "desarrollada por"}
 
@@ -166,8 +171,13 @@ class Index:
         region_words = {w for name in REGIONS for w in name.split()}
         terms = [t for t in terms if not regions or not any(w.startswith(t) for w in region_words)] or terms
         cand = {}
-        for rowid, score in self._fts(terms, limit=150):
+        for rowid, score in self._fts(terms, limit=400):
             cand[rowid] = -score
+        # laws with many matching articles are probably the main law on the subject
+        per_law_hits = {}
+        for rowid in cand:
+            lid = self._law_of(rowid).get("id")
+            per_law_hits[lid] = per_law_hits.get(lid, 0) + 1
         if regions:   # make sure each region the question names gets its own results
             rows = self._fts(terms, limit=-1)
             for j in regions:
@@ -194,7 +204,7 @@ class Index:
             in_title = sum(1 for t in terms if re.search(rf"(?<![a-z]){re.escape(t)}", title)) / max(1, len(terms))
             place = (0.4 if law.get("jur") in regions else 0) if regions else (0.25 if law.get("jur") == "es" else 0)
             score = (s / top) + 0.15 * RANK_BOOST.get(law.get("rank"), 0) + (0.5 if u["law"] in named else 0) \
-                + 0.2 * in_title + place - (0.3 if junk else 0)
+                + 0.2 * in_title + 0.3 * min(1.0, per_law_hits.get(u["law"], 0) / 15) + place - (0.3 if junk else 0)
             scored.append((score, u))
         scored.sort(key=lambda x: -x[0])
         out, per = [], {}
@@ -219,7 +229,7 @@ class Index:
         """A short record of a named law: status and its most important links (from the graph)."""
         law = self.laws[lid]
         lines = [f"{law['title']} ({lid}). Rango: {law['rank'].replace('_', ' ')}. "
-                 f"Ámbito: {'estatal' if law['jur'] == 'es' else law['jur']}. Estado: {STATUS_ES.get(law['status'], 'otro')}."]
+                 f"Ámbito: {JUR_NAMES.get(law['jur'], law['jur'])}. Estado: {STATUS_ES.get(law['status'], 'otro')}."]
         later = (self.refs.get(lid) or [[], []])[1]
         for rel, label in REL_SHOW.items():
             if rel not in self.rel or rel in ("DEROGA",):
@@ -237,7 +247,8 @@ class Index:
         sources = []
         for lid in self.mentioned(question)[:3]:
             law = self.laws[lid]
-            sources.append({"kind": "law", "law": lid, "title": law["title"], "unit": "",
+            sources.append({"kind": "law", "law": lid, "title": law["title"], "unit": "", "where": JUR_NAMES.get(law["jur"], law["jur"]),
+                            "status": STATUS_ES.get(law["status"], "otro"),
                             "eli": eli_url(law["eli"]), "text": self.law_record(lid)})
         for u in units:
             law = self.laws.get(u["law"], {"title": u["law"], "eli": None})
@@ -248,5 +259,6 @@ class Index:
                 start = max(0, pos - max_chars // 3)
                 text = ("…" if start else "") + text[start:start + max_chars] + "…"
             sources.append({"kind": "article", "law": u["law"], "title": law["title"], "unit": u["unit"],
+                            "where": JUR_NAMES.get(law.get("jur"), law.get("jur")), "status": STATUS_ES.get(law.get("status"), "otro"),
                             "context": u["context"], "since": u["since"], "eli": eli_url(law.get("eli")), "text": text})
         return sources, terms
