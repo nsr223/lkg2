@@ -1,12 +1,22 @@
 # Settings for the LKG 2.0 Q&A service (server/app.py).
 # Changes apply to the next question; no restart needed.
 
+# How questions are answered: "plain-llm" (the model alone, from memory) or "rag" (LKG 2.0 is searched
+# first and the articles found are given to the model). rag needs the search database (see the README).
+scenario: plain-llm
+
+rag:
+  database: search.db            # built by scripts/build_search.py; not in git
+  results: 6                     # articles given to the model
+  rewrite_query: true            # ask the model for legal search terms first (finds "arrendamiento" for "alquiler")
+
 # Which model answers: "local" (Ollama on this computer) or "frontier" (a hosted model; needs an API key in .env).
 mode: local
 
 local:
   model: qwen2.5:7b              # any model pulled with `ollama pull`, e.g. llama3.1:8b, gemma2:9b
   url: http://localhost:11434
+  num_ctx: 8192                  # context length; RAG prompts need more than Ollama's default
 
 frontier:
   provider: anthropic            # anthropic, openai or gemini

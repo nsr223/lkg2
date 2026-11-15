@@ -4,6 +4,7 @@ Works with the demo questions and with a benchmark file kept elsewhere (for exam
 private repository), so the questions never have to be added to this repository.
 
     python server/ask_all.py                                    # demo questions in private/questions.json
+    python server/ask_all.py --scenario rag --out answers_rag.jsonl   # the same, with LKG 2.0 retrieval
     python server/ask_all.py --questions ../legal-qa-benchmark/data/noah/questions1.jsonl \\
                              --out ../legal-qa-benchmark/results/lkg2_local.jsonl
 
@@ -28,6 +29,7 @@ p = argparse.ArgumentParser()
 p.add_argument("--questions", default=str(ROOT / "private" / "questions.json"))
 p.add_argument("--url", default="http://localhost:8000")
 p.add_argument("--mode", choices=["local", "frontier"], help="override config.yaml for this run")
+p.add_argument("--scenario", choices=["plain-llm", "rag"], help="override config.yaml for this run")
 p.add_argument("--lang", choices=["es", "en"], default="es", help="language of demo questions")
 p.add_argument("--label", help='name for this system in the results (default: "lkg2_<mode>")')
 p.add_argument("--out", default="answers.jsonl")
@@ -46,7 +48,8 @@ try:
 except httpx.HTTPError:
     sys.exit(f"The Q&A server is not running at {a.url}. Start it with: python server/app.py")
 mode = a.mode or info["mode"]
-label = a.label or f"lkg2_{mode}"
+scenario = a.scenario or info["scenario"]
+label = a.label or f"lkg2_{mode}" + ("_rag" if scenario == "rag" else "")
 
 out = pathlib.Path(a.out)
 done = set()
@@ -65,15 +68,18 @@ for x in items:
     if (label, x["id"], variant) in done:
         continue
     question = x.get("question") or x.get(a.lang)
-    rec = {"model": label, "id": x["id"], "variant": variant, "prompt_file": "lkg2-plain-llm",
+    rec = {"model": label, "id": x["id"], "variant": variant, "prompt_file": f"lkg2-{scenario}",
            "prompt": question, "date": datetime.now(timezone.utc).isoformat(timespec="seconds")}
-    body = {"question": question, "mode": mode}
+    body = {"question": question, "mode": mode, "scenario": scenario}
     try:
         r = httpx.post(f"{a.url}/api/qa", json=body, timeout=900)
         j = r.json()
         if r.status_code == 200:
             rec.update(provider=j["provider"], model_id=j["model"], scenario=j["scenario"], mode=j["mode"],
                        answer=j["answer"], seconds=j["seconds"])
+            if j.get("sources"):
+                rec["sources"] = [{"n": s["n"], "law": s["law"], "unit": s["unit"]} for s in j["sources"]]
+                rec["search_terms"] = j.get("search_terms", [])
         else:
             rec.update(answer="", error=j.get("detail", r.text))
     except httpx.HTTPError as e:

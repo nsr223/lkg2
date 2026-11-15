@@ -146,9 +146,8 @@ dt{color:var(--muted)} dd{margin:0;overflow-wrap:anywhere}
 .qa-status{font:12.5px var(--f-ui);border-left:4px solid var(--box-head);background:rgba(75,114,184,.07);padding:7px 10px}
 .qa-status.off{border-left-color:var(--red)}
 .qa-status code{font:12px var(--f-code)}
-.qa-ask{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end;max-width:760px}
+.qa-ask{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;max-width:760px}
 .qa-ask textarea{width:100%;box-sizing:border-box;font:14px/1.5 var(--f-ui);padding:7px 9px;border:1px solid #9AA3B2;background:var(--sheet);color:var(--ink);resize:vertical}
-@media (max-width:600px){.qa-ask{grid-template-columns:1fr}}
 .qa-card{border:1px solid var(--box-edge);margin:14px 0;max-width:760px}
 .qa-card .qq{font:bold 13.5px/1.4 var(--f-ui);color:var(--head);padding:8px 12px;border-bottom:1px solid var(--box-edge);background:rgba(75,114,184,.06)}
 .qa-card .qa{font:13.5px/1.6 var(--f-ui);padding:10px 12px;white-space:pre-wrap;overflow-wrap:anywhere}
@@ -161,6 +160,11 @@ dt{color:var(--muted)} dd{margin:0;overflow-wrap:anywhere}
 .qa-demo .qd[disabled]{color:var(--head);text-decoration:none;cursor:default}
 .qa-demo .qx{color:var(--muted);font-size:12.5px;margin-top:2px}
 .qsrc a{color:var(--link)}
+.qa-btns{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.qa-btns select{font:12.5px var(--f-ui);padding:5px;border:1px solid #9AA3B2;background:var(--sheet);color:var(--ink)}
+.qa-card .qs{font:12px/1.5 var(--f-ui);border-top:1px dotted var(--box-edge);padding:8px 12px}
+.qa-card .qs ol{margin:4px 0 0;padding-left:22px}
+.qa-card .qs li{margin:2px 0}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -229,7 +233,7 @@ dt{color:var(--muted)} dd{margin:0;overflow-wrap:anywhere}
     <p class="qa-status" id="qaStatus"></p>
     <div class="qa-ask">
       <textarea id="qaQ" rows="3"></textarea>
-      <button class="btn" id="qaGo" type="button" data-t="qaAsk"></button>
+      <div class="qa-btns"><select id="qaScen" hidden></select><button class="btn" id="qaGo" type="button" data-t="qaAsk"></button></div>
     </div>
     <div id="qaOut"></div>
     <div id="qaDemoBox" hidden>
@@ -268,9 +272,10 @@ const T = {
     txtClose: "Cerrar", txtGo: "Ir", txtArt: "Artículo", txtNoArt: "No se encontró ese artículo.", txtSrc: "Texto de legalize-es (fuente: BOE). Versión del",
     txtFallback: "El texto completo no se puede cargar en esta vista. Se muestra el comienzo; el texto entero está en el BOE y en legalize-es.",
     tabExplore: "Explorador", tabAbout: "Acerca de", searchBtn: "Buscar", lawBox: "Norma", tabQa: "Preguntas",
-    qaTitle: "Preguntas sobre la legislación", qaIntro: "Haz una pregunta sobre derecho español. De momento responde un modelo de lenguaje sin consultar el grafo (escenario 1); la recuperación sobre LKG 2.0 llegará después. Las respuestas pueden contener errores: comprueba siempre el texto en el BOE.",
+    qaTitle: "Preguntas sobre la legislación", qaIntro: "Haz una pregunta sobre derecho español. Puede responder el modelo solo, de memoria (escenario 1), o primero se buscan en LKG 2.0 los artículos vigentes que mejor encajan y el modelo responde a partir de ellos (escenario 2, RAG). Las respuestas pueden contener errores: comprueba siempre el texto en el BOE.",
     qaAsk: "Preguntar", qaBusy: "Pensando…", qaPh: "Escribe tu pregunta (p. ej. «¿Cuánta fianza hay que dar al alquilar una vivienda?»)",
-    qaChecking: "Buscando el servidor de preguntas…", qaOn: (m, p, mode) => `Responde: ${m} (${p}, ${mode === "local" ? "modelo local" : "modelo en la nube"}) · escenario 1: modelo sin recuperación.`,
+    qaChecking: "Buscando el servidor de preguntas…", qaOn: (m, p, mode) => `Responde: ${m} (${p}, ${mode === "local" ? "modelo local" : "modelo en la nube"}).`,
+    qaScen: {"plain-llm": "Solo el modelo (escenario 1)", "rag": "Con LKG 2.0 (RAG, escenario 2)"}, qaUsed: "Fragmentos de LKG 2.0 dados al modelo:", qaCard: "ficha de la norma",
     qaOff: "Las preguntas necesitan el servidor de LKG 2.0 en tu ordenador. Instálalo y arráncalo con", qaOff2: "y abre http://localhost:8000. Instrucciones en el README de GitHub.",
     qaDemoTitle: "Preguntas de ejemplo", qaDemoNote: "Con su respuesta de referencia, comprobada en el texto del BOE. Pulsa una pregunta para hacérsela al modelo.",
     qaRef: "Respuesta de referencia:", qaSrc: "Fuente:", qaMeta: (m, p, s) => `${m} (${p}) · ${s} s`, qaFail: "No se pudo obtener respuesta.",
@@ -317,9 +322,10 @@ const T = {
     txtClose: "Close", txtGo: "Go", txtArt: "Article", txtNoArt: "That article was not found.", txtSrc: "Text from legalize-es (source: BOE). Version of",
     txtFallback: "The full text cannot be loaded in this view. The start is shown below; the whole text is on the BOE and legalize-es.",
     tabExplore: "Explorer", tabAbout: "About", searchBtn: "Search", lawBox: "Law", tabQa: "Q&A",
-    qaTitle: "Questions about the legislation", qaIntro: "Ask a question about Spanish law. For now a language model answers without looking anything up in the graph (scenario 1); retrieval over LKG 2.0 comes later. Answers may contain errors: always check the text in the BOE.",
+    qaTitle: "Questions about the legislation", qaIntro: "Ask a question about Spanish law. The model can answer alone, from memory (scenario 1), or LKG 2.0 is searched first for the articles in force that fit best and the model answers from them (scenario 2, RAG). Answers may contain errors: always check the text in the BOE.",
     qaAsk: "Ask", qaBusy: "Thinking…", qaPh: "Type your question (e.g. “How much deposit must be paid when renting a home?”)",
-    qaChecking: "Looking for the Q&A server…", qaOn: (m, p, mode) => `Answering: ${m} (${p}, ${mode === "local" ? "local model" : "hosted model"}) · scenario 1: model without retrieval.`,
+    qaChecking: "Looking for the Q&A server…", qaOn: (m, p, mode) => `Answering: ${m} (${p}, ${mode === "local" ? "local model" : "hosted model"}).`,
+    qaScen: {"plain-llm": "Model only (scenario 1)", "rag": "With LKG 2.0 (RAG, scenario 2)"}, qaUsed: "LKG 2.0 passages given to the model:", qaCard: "law record",
     qaOff: "Questions need the LKG 2.0 server running on your computer. Install and start it with", qaOff2: "and open http://localhost:8000. Instructions in the GitHub README.",
     qaDemoTitle: "Example questions", qaDemoNote: "With a reference answer checked against the BOE text. Click a question to ask the model.",
     qaRef: "Reference answer:", qaSrc: "Source:", qaMeta: (m, p, s) => `${m} (${p}) · ${s} s`, qaFail: "No answer could be obtained.",
@@ -954,11 +960,11 @@ function showView(v){
 document.querySelectorAll(".tab[data-view]").forEach(a => a.addEventListener("click", e => { e.preventDefault(); showView(a.dataset.view); }));
 
 /* Q&A tab: talks to the local LKG 2.0 server (server/app.py) at api/qa; on the static site it only lists the demo questions. */
-const qa = {info: undefined, questions: null, log: [], busy: false};
+const qa = {info: undefined, questions: null, log: [], busy: false, scen: null};
 function qaOpen(){
   if (qa.info === undefined) {
     qa.info = null; qaRender();
-    fetch("api/qa").then(r => r.ok ? r.json() : null).then(j => { qa.info = j && j.service === "lkg2-qa" ? j : false; qaRender(); }).catch(() => { qa.info = false; qaRender(); });
+    fetch("api/qa").then(r => r.ok ? r.json() : null).then(j => { qa.info = j && j.service === "lkg2-qa" ? j : false; if (qa.info) qa.scen = qa.info.rag_available ? qa.info.scenario : "plain-llm"; qaRender(); }).catch(() => { qa.info = false; qaRender(); });
   }
   if (!qa.questions) fetch("api/questions").then(r => r.ok ? r.json() : null).then(j => { qa.questions = j ? j.questions : []; qaRender(); }).catch(() => { qa.questions = []; qaRender(); });
 }
@@ -975,7 +981,7 @@ async function qaAsk(text, demo){
   text = (text || "").trim(); if (!text || qa.busy || !qa.info) return;
   const item = {q: text, demo, res: null, err: null}; qa.log.unshift(item); qa.busy = true; qaRender();
   try {
-    const r = await fetch("api/qa", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({question: text})});
+    const r = await fetch("api/qa", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({question: text, scenario: qa.scen || undefined})});
     const j = await r.json().catch(() => ({}));
     if (r.ok) item.res = j; else item.err = j.detail || (t("qaFail") + " (" + r.status + ")");
   } catch (e) { item.err = t("qaFail"); }
@@ -987,11 +993,18 @@ function qaRender(){
   else if (qa.info) s.textContent = t("qaOn")(qa.info.model, qa.info.provider, qa.info.mode);
   else { s.classList.add("off"); s.replaceChildren(t("qaOff") + " ", el("code", {text: "pip install -r server/requirements.txt && python server/app.py"}), " " + t("qaOff2")); }
   const off = !qa.info;
+  const sel = $("#qaScen"); sel.hidden = !(qa.info && qa.info.rag_available);
+  sel.replaceChildren(...["plain-llm", "rag"].map(v => { const o = el("option", {value: v, text: t("qaScen")[v]}); if (v === qa.scen) o.selected = true; return o; }));
+  sel.disabled = qa.busy;
   $("#qaQ").disabled = off; $("#qaQ").placeholder = t("qaPh");
   $("#qaGo").disabled = off || qa.busy; $("#qaGo").textContent = qa.busy ? t("qaBusy") : t("qaAsk");
   $("#qaOut").replaceChildren(...qa.log.map(it => {
     const card = el("div", {class: "qa-card"}, el("div", {class: "qq", text: it.q}));
-    if (it.res) card.append(el("div", {class: "qa", text: it.res.answer}), el("div", {class: "qm", text: t("qaMeta")(it.res.model, it.res.provider, it.res.seconds)}));
+    if (it.res) {
+      card.append(el("div", {class: "qa", text: it.res.answer}), el("div", {class: "qm", text: t("qaMeta")(it.res.model, it.res.provider, it.res.seconds) + " · " + (t("qaScen")[it.res.scenario] || it.res.scenario)}));
+      if (it.res.sources && it.res.sources.length) card.append(el("div", {class: "qs"}, el("strong", {text: t("qaUsed")}),
+        el("ol", {}, ...it.res.sources.map(s => el("li", {value: s.n}, lawLink(s.law), ", " + (s.unit || t("qaCard")))))));
+    }
     else if (it.err) card.append(el("div", {class: "qa err", text: it.err}));
     else card.append(el("div", {class: "qa", text: t("qaBusy")}));
     if (it.demo) card.append(el("div", {class: "qr"}, el("strong", {text: t("qaRef") + " "}), it.demo["answer_" + st.lang], sourcesLine(it.demo.sources)));
@@ -1003,6 +1016,7 @@ function qaRender(){
     el("div", {class: "qx"}, `[${t("qaTypes")[q.type] || q.type}] `, el("strong", {text: t("qaRef") + " "}), q["answer_" + st.lang], sourcesLine(q.sources)))));
 }
 $("#qaGo").addEventListener("click", () => qaAsk($("#qaQ").value, null));
+$("#qaScen").addEventListener("change", e => { qa.scen = e.target.value; });
 $("#qaQ").addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) qaAsk($("#qaQ").value, null); });
 $("#go").addEventListener("click", () => { st.q = $("#q").value.trim(); st.shown = 50; render(); });
 $("#q").addEventListener("input", e => { st.q = e.target.value.trim(); st.shown = 50; render(); });

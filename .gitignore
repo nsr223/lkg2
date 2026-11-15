@@ -5,3 +5,4 @@ __pycache__/
 .venv/
 answers*.json
 answers*.jsonl
+search.db

@@ -48,8 +48,9 @@ def ask_ollama(cfg, question, system, temperature, timeout):
     model = cfg["model"]
     body = {"model": model, "stream": False,
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": question}]}
+    body["options"] = {"num_ctx": cfg.get("num_ctx", 8192)}   # Ollama's default context is too short for RAG prompts
     if temperature is not None:
-        body["options"] = {"temperature": temperature}
+        body["options"]["temperature"] = temperature
     try:
         data = _post(f"{url}/api/chat", body, {}, timeout)
     except ModelError as e:
@@ -106,8 +107,23 @@ def describe(config, mode):
     return f["provider"], f["model"]
 
 
-def ask(config, question, mode):
-    system = config.get("system_prompt") or SYSTEM_PROMPT
+RAG_PROMPT = (
+    "Eres un asistente sobre legislación española. Responde a la pregunta usando los fragmentos de legislación "
+    "que se te dan (de LKG 2.0, a partir de los textos del BOE). Indica la norma y el artículo en que te basas y "
+    "el número del fragmento entre corchetes, p. ej. [2]. Si los fragmentos no bastan para responder, dilo "
+    "claramente y no inventes normas ni artículos. Responde de forma breve y en el idioma de la pregunta."
+)
+
+REWRITE_PROMPT = (
+    "Devuelve entre 4 y 10 términos de búsqueda en español, separados por comas, que probablemente aparezcan "
+    "en el texto del artículo de ley que responde a la pregunta. Usa el vocabulario de las leyes (por ejemplo "
+    "«arrendamiento» en vez de «alquiler», «trabajador» en vez de «empleado»). No incluyas nombres ni números "
+    "de leyes. Escribe solo los términos."
+)
+
+
+def ask(config, question, mode, system=None):
+    system = system or config.get("system_prompt") or SYSTEM_PROMPT
     temperature = config.get("temperature", 0)
     timeout = config.get("timeout", 120)
     if mode == "local":
