@@ -35,4 +35,4 @@ print("Unpacking…")
 with gzip.open(gz, "rb") as src, open(out, "wb") as dst:
     shutil.copyfileobj(src, dst, 1 << 20)
 gz.unlink()
-print(f"Done: {out} ({out.stat().st_size / 1e9:.1f} GB). The Q&A tab can now use "With LKG 2.0"; reload the page.")
+print(f"Done: {out} ({out.stat().st_size / 1e9:.1f} GB). The Q&A tab can now use 'With LKG 2.0'; reload the page.")
