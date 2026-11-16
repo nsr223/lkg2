@@ -6,3 +6,4 @@ __pycache__/
 answers*.json
 answers*.jsonl
 search.db
+search.vec*

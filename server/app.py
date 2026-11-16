@@ -110,8 +110,9 @@ def qa_info():
     provider, model = llm.describe(config, config["mode"])
     rag = get_index(config) is not None
     scenario = config.get("scenario", "plain-llm")
+    index = get_index(config)
     return {"service": "lkg2-qa", "scenario": scenario if rag or scenario != "rag" else "plain-llm",
-            "rag_available": rag, "mode": config["mode"], "provider": provider, "model": model}
+            "rag_available": rag, "search_by_meaning": bool(index and index.vectors and (config.get("rag", {}).get("semantic") or {}).get("enabled", True)), "mode": config["mode"], "provider": provider, "model": model}
 
 
 @app.post("/api/qa", response_model=Answer)
@@ -145,7 +146,16 @@ def qa(q: Question):
                 extra, hints = llm.parse_rewrite(words)
                 if not rag.get("suggest_laws", True):
                     hints = []
-            found, terms = index.context(asked, extra, k=rag.get("results", 6), max_chars=rag.get("max_chars", 1800), hints=hints)
+            sem = rag.get("semantic") or {}
+            use_sem = index.vectors is not None and sem.get("enabled", True)
+            if use_sem and sem.get("model", "bge-m3") != index.vectors.meta["model"]:
+                raise HTTPException(500, f"config.yaml: rag.semantic.model must be {index.vectors.meta['model']!r}, the model "
+                                         "the article vectors were built with (scripts/build_vectors.py).")
+            vec = (lambda text: llm.embed(sem, text)) if use_sem else (lambda text: None)
+            users = [t["content"] for t in history if t["role"] == "user"]
+            found, terms = index.context(asked, extra, k=rag.get("results", 6), max_chars=rag.get("max_chars", 1800), hints=hints,
+                                         qvec=vec(asked), sem_weight=sem.get("weight", 1.0),
+                                         earlier=(users[0], vec(users[0])) if users else None)
             sources = [dict(s, n=i + 1, url=f"https://www.boe.es/buscar/act.php?id={s['law']}") for i, s in enumerate(found)]
             blocks = []
             for s in sources:

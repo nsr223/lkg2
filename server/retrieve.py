@@ -6,6 +6,7 @@ question names, from data/laws.json and data/refs.json.
 """
 import bisect
 import json
+import os
 import re
 import sqlite3
 import unicodedata
@@ -130,6 +131,38 @@ def best_window(text, terms, max_chars):
     return head + "\n\n" + note + chunk + ("\n\n[…]" if j < len(body) or len(chunk) == budget else "")
 
 
+class Vectors:
+    """Article vectors made by scripts/build_vectors.py, for search by meaning: one or more rows per article, in the order of unit ids."""
+
+    def __init__(self, base):
+        import numpy as np   # only needed when the vectors have been built
+        self.np = np
+        self.meta = json.load(open(base + ".json", encoding="utf-8"))
+        self.ids = np.fromfile(base + ".ids", dtype=np.int32)
+        self.vec = np.memmap(base, dtype=np.float16, mode="r", shape=(len(self.ids), self.meta["dim"]))
+
+    def top(self, q, n, lo=None, hi=None):
+        """The n articles closest in meaning to the query vector, as [(unit id, similarity)], optionally within an id range."""
+        np = self.np
+        q = np.asarray(q, dtype=np.float32)
+        a = 0 if lo is None else int(np.searchsorted(self.ids, lo))
+        b = len(self.ids) if hi is None else int(np.searchsorted(self.ids, hi, side="right"))
+        if b <= a:
+            return []
+        sims = np.concatenate([self.vec[i:min(i + 50000, b)].astype(np.float32) @ q for i in range(a, b, 50000)])
+        m = min(n * 4, len(sims))   # an article can have several vectors (one per piece): keep its best one
+        best = np.argpartition(-sims, m - 1)[:m]
+        best = best[np.argsort(-sims[best])]
+        out, seen = [], set()
+        for i in best:
+            uid = int(self.ids[a + i])
+            if uid not in seen:
+                seen.add(uid); out.append((uid, float(sims[i])))
+                if len(out) == n:
+                    break
+        return out
+
+
 class Index:
     def __init__(self, db_path, laws_path, refs_path):
         self.db = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, check_same_thread=False)
@@ -147,6 +180,8 @@ class Index:
         # each law's articles have consecutive ids: keep the ranges to find a row's law quickly
         self.ranges = sorted(self.db.execute("SELECT min(id), max(id), law FROM units GROUP BY law").fetchall())
         self.starts = [r[0] for r in self.ranges]
+        base = os.path.splitext(str(db_path))[0] + ".vec"
+        self.vectors = Vectors(base) if os.path.exists(base + ".json") else None
 
     # --- understanding the question -------------------------------------------------------------
     @staticmethod
@@ -239,8 +274,9 @@ class Index:
                               (law, f"Artículo {number}", f"Artículo {number} %")).fetchone()
         return row[0] if row else None
 
-    def search(self, question, extra_terms=(), k=6, per_law=3, hints=()):
-        """hints: names of laws that probably govern the question (suggested by the model before the search)."""
+    def search(self, question, extra_terms=(), k=6, per_law=3, hints=(), qvec=None, sem_weight=1.0):
+        """hints: names of laws that probably govern the question (suggested by the model before the search).
+        qvec: the question as a vector (same model as the article vectors); adds search by meaning to search by words."""
         terms = self.terms(question)
         for t in self.terms(" ".join(extra_terms)):
             if t not in terms:
@@ -271,6 +307,20 @@ class Index:
         for law in named + hinted:
             for rowid, score in self._fts(terms, law=law, limit=15):
                 cand[rowid] = max(cand.get(rowid, 0), -score)
+        sem = {}
+        if qvec is not None and self.vectors is not None:   # search by meaning: overall, and inside each law we were pointed to
+            for rowid, sim in self.vectors.top(qvec, 200):
+                sem[rowid] = sim
+            s_hi, s_lo = (max(sem.values()), min(sem.values())) if sem else (1.0, 0.0)
+            for law in named + hinted:
+                lo, hi = self.db.execute("SELECT min(id), max(id) FROM units WHERE law = ?", (law,)).fetchone()
+                for rowid, sim in (self.vectors.top(qvec, 15, lo, hi) if lo is not None else []):
+                    sem.setdefault(rowid, sim)
+            for rowid in sem:
+                sem[rowid] = min(1.0, max(0.0, (sem[rowid] - s_lo) / max(1e-9, s_hi - s_lo)))
+                cand.setdefault(rowid, 0.0)
+                lid = self._law_of(rowid).get("id")
+                per_law_hits.setdefault(lid, 0)
         pinned = []
         for m in re.finditer(r"art[ií]culo\s+(\d+(?:\s*(?:bis|ter))?)", norm(question)):
             for law in named:
@@ -279,7 +329,7 @@ class Index:
                     pinned.append(rid)
         if not cand and not pinned:
             return [], terms
-        top = max(cand.values()) if cand else 1.0
+        top = (max(cand.values()) if cand else 1.0) or 1.0
         scored = []
         for rowid, s in cand.items():
             u = self._unit(rowid)
@@ -288,7 +338,7 @@ class Index:
             title = norm(law.get("title", ""))
             in_title = sum(1 for t in terms if re.search(rf"(?<![a-z]){re.escape(t)}", title)) / max(1, len(terms))
             place = (0.4 if law.get("jur") in regions else 0) if regions else (0.25 if law.get("jur") == "es" else 0)
-            score = (s / top) + 0.15 * RANK_BOOST.get(law.get("rank"), 0) + (0.5 if u["law"] in named else 0.4 if u["law"] in hinted else 0) \
+            score = (s / top) + sem_weight * sem.get(rowid, 0.0) + 0.15 * RANK_BOOST.get(law.get("rank"), 0) + (0.5 if u["law"] in named else 0.4 if u["law"] in hinted else 0) \
                 + 0.2 * in_title + 0.3 * min(1.0, per_law_hits.get(u["law"], 0) / 15) + place - (0.3 if junk else 0)
             scored.append((score, u))
         scored.sort(key=lambda x: -x[0])
@@ -327,9 +377,18 @@ class Index:
                 lines.append(f"{label.capitalize()}: " + "; ".join(names) + more + ".")
         return "\n".join(lines)
 
-    def context(self, question, extra_terms=(), k=6, max_chars=1800, hints=()):
-        """The sources to give the model: records of named laws first, then the articles found."""
-        units, terms = self.search(question, extra_terms, k=k, hints=hints)
+    def context(self, question, extra_terms=(), k=6, max_chars=1800, hints=(), qvec=None, sem_weight=1.0, earlier=None):
+        """The sources to give the model: records of named laws first, then the articles found.
+
+        earlier: in a conversation, (first question, its vector or None). The first question is searched alone
+        and keeps half of the places, so a later message (which may be wrong, or off the subject) can add
+        sources but cannot push out what the original question found.
+        """
+        units, terms = self.search(question, extra_terms, k=k, hints=hints, qvec=qvec, sem_weight=sem_weight)
+        if earlier:
+            first, _ = self.search(earlier[0], extra_terms, k=k, hints=hints, qvec=earlier[1], sem_weight=sem_weight)
+            keep = first[:(k + 1) // 2]
+            units = (keep + [u for u in units if all(u["rowid"] != f["rowid"] for f in keep)])[:k]
         sources = []
         for lid in self.mentioned(question)[:3]:
             law = self.laws[lid]

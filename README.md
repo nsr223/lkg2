@@ -121,6 +121,28 @@ python3 scripts/build_search.py data/laws.json data/hist legalize-es search.db  
 It holds every law in force (`--all` adds repealed ones): about 10,000 consolidated laws from `data/hist` and 11,000 with
 only an original text, split into about 537,000 articles, searched with SQLite full-text search (no extra software).
 
+**Search by meaning (optional).** Word search misses an article when the question uses other words than the law
+("me pagan tarde el sueldo" against "retrasos continuados en el abono del salario"). To also search by meaning,
+give every article a vector with a local embedding model:
+
+```bash
+ollama pull bge-m3
+python3 scripts/build_vectors.py search.db             # every article: several hours on a laptop; can be stopped and resumed
+python3 scripts/build_vectors.py search.db --jur es    # or only state-level laws, about 60 % of the articles
+```
+
+Long articles are split into pieces of whole paragraphs, each with its own vector (about 990,000 vectors for
+537,000 articles), so a paragraph deep inside a long article can be found by its own meaning. `--max-pieces 1`
+embeds only the beginning of each article and takes about half the time.
+
+This writes `search.vec`, `search.vec.ids` and `search.vec.json` next to the database (not in git). When they are
+there the server uses them: each question is turned into a vector with the same model (`rag.semantic` in
+`config.yaml`) and the articles closest in meaning are added to the ones found by words. `GET /api/qa` then reports
+`"search_by_meaning": true`. Everything runs on this computer.
+
+In a conversation, the first question is also searched alone and keeps half of the places among the sources, so
+a later message can add sources but cannot push out what the original question found.
+
 ## Rebuilding the data
 
 ```bash

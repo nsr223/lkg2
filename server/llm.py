@@ -95,6 +95,22 @@ def ask_gemini(cfg, turns, system, temperature, timeout):
     return "".join(p.get("text", "") for p in parts), "gemini", model
 
 
+def embed(cfg, text, timeout=60):
+    """The text as a vector, from a local embedding model in Ollama (search by meaning). cfg: rag.semantic in config.yaml."""
+    url = cfg.get("url", "http://localhost:11434").rstrip("/")
+    model = cfg.get("model", "bge-m3")
+    try:
+        data = _post(f"{url}/api/embed", {"model": model, "input": [cfg.get("query_prefix", "") + text]}, {}, timeout)
+    except ModelError as e:
+        msg = str(e)
+        if msg.startswith("Could not connect"):
+            msg = f"Could not reach Ollama at {url} for search by meaning. Is it running (ollama serve)?"
+        elif "not found" in msg:
+            msg = f"Ollama does not have the embedding model {model}. Run: ollama pull {model}"
+        raise ModelError(msg) from None
+    return data["embeddings"][0]
+
+
 FRONTIER = {"anthropic": ask_anthropic, "openai": ask_openai, "gemini": ask_gemini}
 
 
