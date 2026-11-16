@@ -92,7 +92,7 @@ python server/ask_all.py --questions path/to/benchmark.jsonl --out path/to/resul
 python server/ask_all.py --questions path/to/benchmark.jsonl --scenario rag --model llama3.1:8b --out path/to/results.jsonl
 ```
 
-**Two scenarios** (`scenario` in `config.yaml`, or `"scenario"` in the request; the Q&A tab has a selector):
+**Three scenarios** (`scenario` in `config.yaml`, or `"scenario"` in the request; the Q&A tab has a selector):
 
 - `plain-llm` (scenario 1): the model answers from its own knowledge.
 - `rag` (scenario 2): LKG 2.0 is searched first and the model answers from what is found: the articles in force that
@@ -103,6 +103,7 @@ python server/ask_all.py --questions path/to/benchmark.jsonl --scenario rag --mo
   A model often knows which law applies even when it does not remember the current text of the article.
   Long articles are cut to the paragraphs that best match the search (`rag.max_chars`), with a note saying which
   numbered paragraph the cut starts in.
+- `rag-graph` (scenario 3): as `rag`, and links from the best articles are followed (see below).
 
 `rag` needs the search database, `search.db` (about 1 GB, not in git). Download the ready-made one from the
 [release](https://github.com/nsr223/lkg2/releases/tag/search-db-2026-11-15) (about 700 MB):
@@ -142,6 +143,19 @@ there the server uses them: each question is turned into a vector with the same 
 
 In a conversation, the first question is also searched alone and keeps half of the places among the sources, so
 a later message can add sources but cannot push out what the original question found.
+
+**Scenario 3, `rag-graph` (first draft).** The same search as `rag`, then links are followed from the three best
+articles found, and the article reached that best matches the question takes the last place among the sources
+(`rag.graph.slots`). Two kinds of link (`rag.graph.links`):
+
+- `text`: the articles that the text of a result refers to ("de acuerdo con el artículo 45.1.d)", "el artículo
+  139 de la Ley 36/2011"). This is the default.
+- `official`: the laws officially linked to a result's law in the graph (developed by, issued under, cited by;
+  amendments and repeals are left out), searched with the same question.
+
+An article reached by a link is used only if it shares at least two search terms with the question. The response
+says how each one was reached (`via`), and the model sees it too. The number of sources is the same as in `rag`,
+so the two scenarios can be compared.
 
 ## Rebuilding the data
 

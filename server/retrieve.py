@@ -62,6 +62,10 @@ SYNONYMS = {"alquil": "arrendamiento", "inquilin": "arrendatario", "casero": "ar
             "empleador": "empresario", "jefe": "empresario", "sueldo": "salario", "paro": "desempleo", "baja": "incapacidad temporal",
             "multa": "sancion", "denuncia": "denuncia", "piso": "vivienda", "herencia": "sucesion", "divorcio": "divorcio",
             "deposito": "fianza", "despedir": "despido", "echar": "despido", "vacaciones": "vacaciones"}
+FOLLOW = {"SE DESARROLLA": "que desarrolla", "DESARROLLA": "desarrollada por", "DE CONFORMIDAD CON": "en la que se basa",
+          "SE DICTA DE CONFORMIDAD": "dictada de conformidad con", "CITA": "citada por", "EN RELACIÓN CON": "relacionada con",
+          "SE DICTA EN RELACIÓN": "relacionada con", "TRANSPONE": "transpuesta por"}
+ART_REF = re.compile(r"art[ií]culos?\s+(\d+(?:\s(?:bis|ter|quater))?)", re.I)
 NAMED_EXTRA = 1   # a law the question names, or the model suggests, may fill one more of the result slots
 REGIONS = {"andalucia": "es-an", "aragon": "es-ar", "asturias": "es-as", "cantabria": "es-cb", "castilla y leon": "es-cl",
            "castilla-la mancha": "es-cm", "castilla la mancha": "es-cm", "canarias": "es-cn", "cataluna": "es-ct", "catalunya": "es-ct",
@@ -360,6 +364,74 @@ class Index:
             out.append(u); per[u["law"]] = per.get(u["law"], 0) + 1
         return out, terms
 
+    # --- following links (scenario 3) -------------------------------------------------------------
+    def cited_in(self, unit):
+        """Articles that the text of an article refers to: [(law id, article number)].
+
+        "el artículo 45.1.d)" points inside the same law; "el artículo 139 de la Ley 36/2011" points to the law
+        named in the words that follow. References a unit makes to itself are left out.
+        """
+        out, text = [], unit["text"]
+        for m in ART_REF.finditer(text):
+            number = re.sub(r"\s+", " ", m.group(1))
+            after = text[m.end():m.end() + 90]
+            other = self.mentioned(after.split(".\n")[0]) if re.match(r"[\d.\s)a-z,]*\s*(?:de|del)\s+(?:la|el|los|las)?\s*[A-ZÁÉÍÓÚ]", after) else []
+            law = other[0] if other else unit["law"]
+            if (law, number) not in out and not (law == unit["law"] and unit["unit"] == f"Artículo {number}"):
+                out.append((law, number))
+        return out
+
+    def linked_laws(self, lid):
+        """Laws officially linked to a law, with the relation, leaving out amendments and repeals: [(law id, label)]."""
+        earlier, later = (self.refs.get(lid) or [[], []])[:2]
+        out = []
+        for r, to in list(earlier) + list(later):
+            label = FOLLOW.get(self.rel[r])
+            if label and to in self.in_db and to != lid and all(to != o[0] for o in out):
+                out.append((to, label))
+        return out
+
+    def expand(self, units, terms, qvec=None, slots=1, links=("text",), top=3):
+        """Scenario 3: articles reached by following links from the best results, most relevant first.
+
+        From the top results it follows (a) the articles their text refers to and (b) the laws officially
+        linked to their laws, searched with the same question. An article reached this way is kept only if it
+        shares at least two search terms with the question, so a link alone is not enough. Each one records
+        how it was reached ("via"), which is shown to the model.
+        """
+        have = {u["rowid"] for u in units}
+        cands = {}
+
+        def add(rowid, via):
+            if rowid is not None and rowid not in have and rowid not in cands:
+                cands[rowid] = via
+
+        def short(lid):
+            return re.sub(r",? de \d+ de \w+,?", "", self.laws[lid]["title"])[:70]
+        for i, u in enumerate(units[:top]):
+            if "text" in links:
+                for law, number in self.cited_in(u)[:12]:
+                    if law in self.in_db:
+                        add(self.article(law, number), f"citado en [{i + 1}] {u['unit']}")
+            if "official" in links:
+                for law, label in self.linked_laws(u["law"])[:8]:
+                    for rowid, _ in self._fts(terms, law=law, limit=2):
+                        add(rowid, f"norma {label} {short(u['law'])}")
+        scored = []
+        for rowid, via in cands.items():
+            x = self._unit(rowid)
+            flat = norm(x["text"])
+            shared = sum(1 for t in terms if t in flat)
+            if shared < 2:
+                continue
+            sim = 0.0
+            if qvec is not None and self.vectors is not None:
+                hit = self.vectors.top(qvec, 1, rowid, rowid)
+                sim = hit[0][1] if hit else 0.0
+            scored.append((shared / max(1, len(terms)) + sim, dict(x, via=via)))
+        scored.sort(key=lambda p: -p[0])
+        return [x for _, x in scored[:slots]]
+
     # --- records for the model ------------------------------------------------------------------
     def law_record(self, lid):
         """A short record of a named law: status and its most important links (from the graph)."""
@@ -377,18 +449,25 @@ class Index:
                 lines.append(f"{label.capitalize()}: " + "; ".join(names) + more + ".")
         return "\n".join(lines)
 
-    def context(self, question, extra_terms=(), k=6, max_chars=1800, hints=(), qvec=None, sem_weight=1.0, earlier=None):
+    def context(self, question, extra_terms=(), k=6, max_chars=1800, hints=(), qvec=None, sem_weight=1.0, earlier=None, graph=None):
         """The sources to give the model: records of named laws first, then the articles found.
 
         earlier: in a conversation, (first question, its vector or None). The first question is searched alone
         and keeps half of the places, so a later message (which may be wrong, or off the subject) can add
         sources but cannot push out what the original question found.
+        graph: scenario 3 settings, e.g. {"slots": 1, "links": ["text"]}. The last `slots` places go
+        to articles reached by following links from the best results (see expand); the total stays k.
         """
         units, terms = self.search(question, extra_terms, k=k, hints=hints, qvec=qvec, sem_weight=sem_weight)
         if earlier:
             first, _ = self.search(earlier[0], extra_terms, k=k, hints=hints, qvec=earlier[1], sem_weight=sem_weight)
             keep = first[:(k + 1) // 2]
             units = (keep + [u for u in units if all(u["rowid"] != f["rowid"] for f in keep)])[:k]
+        if graph:
+            slots = int(graph.get("slots", 1))
+            extra = self.expand(units, terms, qvec=qvec, slots=slots, links=tuple(graph.get("links", ("text",))))
+            if extra:
+                units = units[:max(0, k - len(extra))] + extra
         sources = []
         for lid in self.mentioned(question)[:3]:
             law = self.laws[lid]
@@ -400,5 +479,6 @@ class Index:
             text = best_window(u["text"], terms, max_chars)
             sources.append({"kind": "article", "law": u["law"], "title": law["title"], "unit": u["unit"],
                             "where": JUR_NAMES.get(law.get("jur"), law.get("jur")), "status": STATUS_ES.get(law.get("status"), "otro"),
-                            "context": u["context"], "since": u["since"], "eli": eli_url(law.get("eli")), "text": text})
+                            "context": u["context"], "since": u["since"], "eli": eli_url(law.get("eli")), "text": text,
+                            "via": u.get("via")})
         return sources, terms

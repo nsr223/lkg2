@@ -27,7 +27,7 @@ import retrieve  # noqa: E402
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CONFIG = pathlib.Path(os.environ.get("LKG_CONFIG", ROOT / "config.yaml"))
 MODES = ("local", "frontier")
-SCENARIOS = ("plain-llm", "rag")
+SCENARIOS = ("plain-llm", "rag", "rag-graph")
 _index = {}
 
 
@@ -69,7 +69,7 @@ class Turn(BaseModel):
 class Question(BaseModel):
     question: str = Field(min_length=1, max_length=4000)
     mode: str | None = Field(None, description="local or frontier; overrides config.yaml for this question")
-    scenario: str | None = Field(None, description="plain-llm or rag; overrides config.yaml for this question")
+    scenario: str | None = Field(None, description="plain-llm, rag or rag-graph; overrides config.yaml for this question")
     model: str | None = Field(None, max_length=100, description="model name; overrides config.yaml for this question (same provider)")
     history: list[Turn] = Field([], max_length=20, description="earlier turns of the conversation, oldest first; "
                                 "'question' is then the latest user message")
@@ -85,6 +85,7 @@ class Source(BaseModel):
     eli: str | None = None
     url: str
     text: str
+    via: str | None = Field(None, description="scenario 3: how this article was reached by following a link")
 
 
 class Answer(BaseModel):
@@ -111,7 +112,7 @@ def qa_info():
     rag = get_index(config) is not None
     scenario = config.get("scenario", "plain-llm")
     index = get_index(config)
-    return {"service": "lkg2-qa", "scenario": scenario if rag or scenario != "rag" else "plain-llm",
+    return {"service": "lkg2-qa", "scenario": scenario if rag or scenario == "plain-llm" else "plain-llm",
             "rag_available": rag, "search_by_meaning": bool(index and index.vectors and (config.get("rag", {}).get("semantic") or {}).get("enabled", True)), "mode": config["mode"], "provider": provider, "model": model}
 
 
@@ -155,12 +156,15 @@ def qa(q: Question):
             users = [t["content"] for t in history if t["role"] == "user"]
             found, terms = index.context(asked, extra, k=rag.get("results", 6), max_chars=rag.get("max_chars", 1800), hints=hints,
                                          qvec=vec(asked), sem_weight=sem.get("weight", 1.0),
-                                         earlier=(users[0], vec(users[0])) if users else None)
+                                         earlier=(users[0], vec(users[0])) if users else None,
+                                         graph=(rag.get("graph") or {}) if scenario == "rag-graph" else None)
             sources = [dict(s, n=i + 1, url=f"https://www.boe.es/buscar/act.php?id={s['law']}") for i, s in enumerate(found)]
             blocks = []
             for s in sources:
                 head = s["title"] + (f" — {s['unit']}" if s["unit"] else " — ficha de la norma (LKG 2.0)")
                 info = [f"ámbito: {s['where']}", s["status"]] + ([f"versión vigente desde {s['since']}"] if s.get("since") else [])
+                if s.get("via"):
+                    info.append("enlazado: " + s["via"])
                 head += " (" + "; ".join(info) + ")"
                 blocks.append(f"[{s['n']}] {head}\n{s['text']}")
             prompt = "Fragmentos:\n\n" + "\n\n".join(blocks) + f"\n\nPregunta: {question}"

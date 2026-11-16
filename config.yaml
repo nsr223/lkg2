@@ -1,8 +1,9 @@
 # Settings for the LKG 2.0 Q&A service (server/app.py).
 # Changes apply to the next question; no restart needed.
 
-# How questions are answered: "plain-llm" (the model alone, from memory) or "rag" (LKG 2.0 is searched
-# first and the articles found are given to the model). rag needs the search database (see the README).
+# How questions are answered: "plain-llm" (the model alone, from memory), "rag" (LKG 2.0 is searched first and
+# the articles found are given to the model) or "rag-graph" (the same, and links from the best articles are
+# followed). rag and rag-graph need the search database (see the README).
 scenario: plain-llm
 
 rag:
@@ -17,6 +18,10 @@ rag:
     url: http://localhost:11434
     query_prefix: ""             # some models expect one, e.g. "query: " for the e5 family; bge-m3 needs none
     weight: 1.0                  # how much meaning counts next to words
+  graph:                         # scenario 3 (rag-graph): follow links from the best articles found
+    slots: 1                     # how many of the places go to articles reached by a link
+    links: [text]                # text = articles cited in the text of the best results;
+                                 # official = laws officially linked to theirs (developed by, issued under...)
 
 # Which model answers: "local" (Ollama on this computer) or "frontier" (a hosted model; needs an API key in .env).
 mode: local
