@@ -61,10 +61,19 @@ def get_index(config):
     return _index[str(path)]
 
 
+class Turn(BaseModel):
+    role: str = Field(pattern="^(user|assistant)$")
+    content: str = Field(min_length=1, max_length=8000)
+
+
 class Question(BaseModel):
     question: str = Field(min_length=1, max_length=4000)
     mode: str | None = Field(None, description="local or frontier; overrides config.yaml for this question")
     scenario: str | None = Field(None, description="plain-llm or rag; overrides config.yaml for this question")
+    model: str | None = Field(None, max_length=100, description="model name; overrides config.yaml for this question (same provider)")
+    history: list[Turn] = Field([], max_length=20, description="earlier turns of the conversation, oldest first; "
+                                "'question' is then the latest user message")
+    references: bool = Field(False, description="ask the model to end with a «REFERENCIAS:» list (law, article and paragraph)")
 
 
 class Source(BaseModel):
@@ -115,21 +124,28 @@ def qa(q: Question):
     if scenario not in SCENARIOS:
         raise HTTPException(422, f"scenario must be one of {SCENARIOS}.")
     question = q.question.strip()
+    history = [t.model_dump() for t in q.history]
+    cite = llm.CITATION_PROMPT if q.references else ""
     start = time.perf_counter()
     sources, terms = [], []
     try:
         if scenario == "plain-llm":
-            answer, provider, model = llm.ask(config, question, mode)
+            system = (config.get("system_prompt") or llm.SYSTEM_PROMPT) + cite
+            answer, provider, model = llm.ask(config, question, mode, system=system, history=history, model=q.model)
         else:
             index = get_index(config)
             if index is None:
                 raise HTTPException(503, "The search database has not been built: run scripts/build_search.py (see the README).")
             rag = config.get("rag", {})
-            extra = []
+            extra, hints = [], []
+            # in a conversation, search with everything the user has said: a follow-up alone ("¿seguro?") names no topic
+            asked = " ".join([t["content"] for t in history if t["role"] == "user"] + [question])
             if rag.get("rewrite_query", True):
-                words, _, _ = llm.ask(config, question, mode, system=llm.REWRITE_PROMPT)
-                extra = [w.strip(" .-*\n") for w in words.replace("\n", ",").split(",") if w.strip()][:12]
-            found, terms = index.context(question, extra, k=rag.get("results", 6))
+                words, _, _ = llm.ask(config, asked, mode, system=llm.REWRITE_PROMPT, model=q.model)
+                extra, hints = llm.parse_rewrite(words)
+                if not rag.get("suggest_laws", True):
+                    hints = []
+            found, terms = index.context(asked, extra, k=rag.get("results", 6), max_chars=rag.get("max_chars", 1800), hints=hints)
             sources = [dict(s, n=i + 1, url=f"https://www.boe.es/buscar/act.php?id={s['law']}") for i, s in enumerate(found)]
             blocks = []
             for s in sources:
@@ -138,7 +154,8 @@ def qa(q: Question):
                 head += " (" + "; ".join(info) + ")"
                 blocks.append(f"[{s['n']}] {head}\n{s['text']}")
             prompt = "Fragmentos:\n\n" + "\n\n".join(blocks) + f"\n\nPregunta: {question}"
-            answer, provider, model = llm.ask(config, prompt, mode, system=config.get("rag_prompt") or llm.RAG_PROMPT)
+            system = (config.get("rag_prompt") or llm.RAG_PROMPT) + cite
+            answer, provider, model = llm.ask(config, prompt, mode, system=system, history=history, model=q.model)
     except llm.ModelError as e:
         raise HTTPException(503, str(e)) from None
     return Answer(question=q.question, answer=answer.strip(), scenario=scenario, mode=mode, provider=provider, model=model,

@@ -9,6 +9,8 @@ rag:
   database: search.db            # built by scripts/build_search.py; not in git
   results: 6                     # articles given to the model
   rewrite_query: true            # ask the model for legal search terms first (finds "arrendamiento" for "alquiler")
+  suggest_laws: true             # ...and for the laws that probably govern the question, to search inside them
+  max_chars: 1800                # longest piece of one article given to the model (long articles are cut to the best part)
 
 # Which model answers: "local" (Ollama on this computer) or "frontier" (a hosted model; needs an API key in .env).
 mode: local

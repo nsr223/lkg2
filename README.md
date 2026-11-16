@@ -73,6 +73,13 @@ override `config.yaml`) returns `{"question", "answer", "scenario", "mode", "pro
 "search_terms"}`. Errors return status 503 with a
 `detail` that says what to fix (Ollama not running, model not pulled, missing API key).
 
+Three more optional fields, used for evaluation runs:
+- `"model": "llama3.1:8b"` uses another model of the same provider for this question, without editing `config.yaml`.
+- `"history": [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]` gives the earlier turns of a
+  conversation; `question` is then the latest user message. In `rag`, the search uses everything the user has said.
+- `"references": true` asks the model to end with a `REFERENCIAS:` list (law, article and paragraph), so answers
+  with and without retrieval can be checked in the same way.
+
 `GET /api/questions` returns the demo questions shown in the tab. They are read from `private/questions.json`, which
 git ignores, so they stay off the web and out of future model training data. Ask the authors for the file.
 
@@ -82,6 +89,7 @@ curl -X POST http://localhost:8000/api/qa -H 'Content-Type: application/json' \
 python server/ask_all.py                        # the demo questions; answers saved to answers.jsonl
 python server/ask_all.py --scenario rag --out answers_rag.jsonl   # the same with LKG 2.0 retrieval, to compare
 python server/ask_all.py --questions path/to/benchmark.jsonl --out path/to/results.jsonl   # any question file
+python server/ask_all.py --questions path/to/benchmark.jsonl --scenario rag --model llama3.1:8b --out path/to/results.jsonl
 ```
 
 **Two scenarios** (`scenario` in `config.yaml`, or `"scenario"` in the request; the Q&A tab has a selector):
@@ -90,7 +98,11 @@ python server/ask_all.py --questions path/to/benchmark.jsonl --out path/to/resul
 - `rag` (scenario 2): LKG 2.0 is searched first and the model answers from what is found: the articles in force that
   best match the question, plus a record of any law the question names (status, repealed by, amended by, from the links
   in the graph). The model is told to cite them as [1], [2]…; the response lists them in `sources` with their ELI.
-  Optionally the model first suggests legal search terms (`rag.rewrite_query`), so "alquiler" also finds "arrendamiento".
+  Optionally the model first suggests legal search terms (`rag.rewrite_query`), so "alquiler" also finds "arrendamiento",
+  and the laws that probably govern the question (`rag.suggest_laws`), which are then searched article by article.
+  A model often knows which law applies even when it does not remember the current text of the article.
+  Long articles are cut to the paragraphs that best match the search (`rag.max_chars`), with a note saying which
+  numbered paragraph the cut starts in.
 
 `rag` needs the search database, `search.db` (about 1 GB, not in git). Download the ready-made one from the
 [release](https://github.com/nsr223/lkg2/releases/tag/search-db-2026-11-15) (about 700 MB):

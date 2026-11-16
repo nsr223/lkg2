@@ -40,6 +40,14 @@ ALIASES = {
     "libertad sindical": "BOE-A-1985-16660", "lols": "BOE-A-1985-16660",
     "prevencion de riesgos laborales": "BOE-A-1995-24292", "lprl": "BOE-A-1995-24292",
     "trabajo a distancia": "BOE-A-2021-11472",
+    "propiedad horizontal": "BOE-A-1960-10906", "lph": "BOE-A-1960-10906",
+    "consumidores y usuarios": "BOE-A-2007-20555", "trlgdcu": "BOE-A-2007-20555",
+    "renta de las personas fisicas": "BOE-A-2006-20764", "irpf": "BOE-A-2006-20764",
+    "extranjeria": "BOE-A-2000-544", "loex": "BOE-A-2000-544",
+    "trafico": "BOE-A-2015-11722", "seguridad vial": "BOE-A-2015-11722",
+    "general tributaria": "BOE-A-2003-23186", "lgt": "BOE-A-2003-23186",
+    "ley de la ciencia": "BOE-A-2011-9617",
+    "relaciones de trabajo": "BOE-A-1977-6061", "derecho de huelga": "BOE-A-1977-6061",
 }
 RANK_WORDS = [("ley organica", "ley_organica"), ("real decreto legislativo", "real_decreto_legislativo"),
               ("real decreto-ley", "real_decreto_ley"), ("real decreto ley", "real_decreto_ley"), ("real decreto", "real_decreto"),
@@ -53,6 +61,7 @@ SYNONYMS = {"alquil": "arrendamiento", "inquilin": "arrendatario", "casero": "ar
             "empleador": "empresario", "jefe": "empresario", "sueldo": "salario", "paro": "desempleo", "baja": "incapacidad temporal",
             "multa": "sancion", "denuncia": "denuncia", "piso": "vivienda", "herencia": "sucesion", "divorcio": "divorcio",
             "deposito": "fianza", "despedir": "despido", "echar": "despido", "vacaciones": "vacaciones"}
+NAMED_EXTRA = 1   # a law the question names, or the model suggests, may fill one more of the result slots
 REGIONS = {"andalucia": "es-an", "aragon": "es-ar", "asturias": "es-as", "cantabria": "es-cb", "castilla y leon": "es-cl",
            "castilla-la mancha": "es-cm", "castilla la mancha": "es-cm", "canarias": "es-cn", "cataluna": "es-ct", "catalunya": "es-ct",
            "extremadura": "es-ex", "galicia": "es-ga", "baleares": "es-ib", "illes balears": "es-ib", "murcia": "es-mc",
@@ -74,6 +83,51 @@ def norm(s):
 
 def eli_url(eli):
     return f"https://www.boe.es/eli/{eli}" if eli else None
+
+
+def best_window(text, terms, max_chars):
+    """The part of a long article to give the model: the run of paragraphs that best matches the search terms.
+
+    Articles are kept whole when they fit. A long one (the Workers' Statute has articles of 20,000 characters)
+    is cut to its heading plus the consecutive paragraphs where most search terms appear, counting a term for
+    more when few paragraphs of the article contain it. If the cut starts inside a numbered paragraph, a note
+    says which one, so the model can still cite "apartado 1, letra n)".
+    """
+    if len(text) <= max_chars:
+        return text
+    paras = [p for p in text.split("\n\n") if p.strip()]
+    head, body = paras[0], paras[1:]
+    if not body:   # one very long paragraph: keep the part around the first term found
+        flat = norm(text)
+        pos = min([flat.find(t) for t in terms if flat.find(t) > 0] or [0])
+        start = max(0, pos - max_chars // 3)
+        return ("…" if start else "") + text[start:start + max_chars] + "…"
+    flat = [norm(p) for p in body]
+    has = [[t in f for t in terms] for f in flat]
+    freq = [sum(h[i] for h in has) for i in range(len(terms))]
+    weight = [sum(1.0 / freq[i] for i in range(len(terms)) if h[i]) for h in has]
+    head = head[:max_chars // 3]
+    budget = max_chars - len(head) - 60
+    best, best_score = (0, 0), -1.0
+    for i in range(len(body)):
+        size, score, j = 0, 0.0, i
+        while j < len(body) and size + len(body[j]) + 2 <= budget:
+            size += len(body[j]) + 2; score += weight[j]; j += 1
+        if j == i:   # this paragraph alone is too long: take its start
+            j, score = i + 1, weight[i]
+        if score > best_score + 1e-9:
+            best, best_score = (i, j), score
+    i, j = best
+    chunk = "\n\n".join(body[i:j])[:budget]
+    note = ""
+    if i > 0:
+        note = "[…]"
+        if not re.match(r"\d+\. ", body[i]):   # say which numbered paragraph the cut starts in
+            inside = next((m.group(1) for p in reversed(body[:i]) for m in [re.match(r"(\d+)\. ", p)] if m), None)
+            if inside:
+                note += f" (dentro del apartado {inside})"
+        note += "\n\n"
+    return head + "\n\n" + note + chunk + ("\n\n[…]" if j < len(body) or len(chunk) == budget else "")
 
 
 class Index:
@@ -128,6 +182,31 @@ class Index:
                 found.append(lid)
         return found
 
+    def resolve(self, name):
+        """The law a name refers to ("Estatuto de los Trabajadores", "Ley 10/2021", "LGSS"), or None.
+
+        Used for the laws the model suggests before the search. Tries the number and the common names first,
+        then the titles: every content word of the name must be in the title; state laws in force of
+        higher rank and with shorter titles win.
+        """
+        found = self.mentioned(name)
+        if found:
+            return found[0]
+        words = [w for w in re.findall(r"[a-z0-9ñ]+", norm(name)) if w not in STOP and len(w) > 2
+                 and w not in ("real", "decreto", "legislativo", "organica", "texto", "refundido", "general")]
+        if len(words) < 2:
+            return None
+        best = None
+        for law in self.laws.values():
+            if law["id"] not in self.in_db:
+                continue
+            title = norm(law["title"])
+            if all(re.search(rf"(?<![a-z]){re.escape(w)}", title) for w in words):
+                key = (law["jur"] != "es", -RANK_BOOST.get(law["rank"], 0), len(title))
+                if best is None or key < best[0]:
+                    best = (key, law["id"])
+        return best[1] if best else None
+
     # --- search -------------------------------------------------------------------------------
     def _fts(self, terms, law=None, limit=40):
         if not terms:
@@ -160,12 +239,18 @@ class Index:
                               (law, f"Artículo {number}", f"Artículo {number} %")).fetchone()
         return row[0] if row else None
 
-    def search(self, question, extra_terms=(), k=6, per_law=3):
+    def search(self, question, extra_terms=(), k=6, per_law=3, hints=()):
+        """hints: names of laws that probably govern the question (suggested by the model before the search)."""
         terms = self.terms(question)
         for t in self.terms(" ".join(extra_terms)):
             if t not in terms:
                 terms.append(t)
         named = [l for l in self.mentioned(question) if l in self.in_db]
+        hinted = []
+        for name in list(hints)[:3]:
+            lid = self.resolve(name)
+            if lid and lid in self.in_db and lid not in named and lid not in hinted:
+                hinted.append(lid)
         q = norm(question)
         regions = sorted({j for name, j in REGIONS.items() if re.search(rf"(?<![a-z]){name}(?![a-z])", q)})
         region_words = {w for name in REGIONS for w in name.split()}
@@ -183,7 +268,7 @@ class Index:
             for j in regions:
                 for rowid, score in [r for r in rows if self._law_of(r[0]).get("jur") == j][:15]:
                     cand[rowid] = max(cand.get(rowid, 0), -score)
-        for law in named:
+        for law in named + hinted:
             for rowid, score in self._fts(terms, law=law, limit=15):
                 cand[rowid] = max(cand.get(rowid, 0), -score)
         pinned = []
@@ -203,7 +288,7 @@ class Index:
             title = norm(law.get("title", ""))
             in_title = sum(1 for t in terms if re.search(rf"(?<![a-z]){re.escape(t)}", title)) / max(1, len(terms))
             place = (0.4 if law.get("jur") in regions else 0) if regions else (0.25 if law.get("jur") == "es" else 0)
-            score = (s / top) + 0.15 * RANK_BOOST.get(law.get("rank"), 0) + (0.5 if u["law"] in named else 0) \
+            score = (s / top) + 0.15 * RANK_BOOST.get(law.get("rank"), 0) + (0.5 if u["law"] in named else 0.4 if u["law"] in hinted else 0) \
                 + 0.2 * in_title + 0.3 * min(1.0, per_law_hits.get(u["law"], 0) / 15) + place - (0.3 if junk else 0)
             scored.append((score, u))
         scored.sort(key=lambda x: -x[0])
@@ -219,7 +304,8 @@ class Index:
         for score, u in scored:
             if len(out) >= k:
                 break
-            if any(o["rowid"] == u["rowid"] for o in out) or per.get(u["law"], 0) >= per_law:
+            cap = per_law + NAMED_EXTRA if u["law"] in named or u["law"] in hinted else per_law   # more room for a law we were pointed to
+            if any(o["rowid"] == u["rowid"] for o in out) or per.get(u["law"], 0) >= cap:
                 continue
             out.append(u); per[u["law"]] = per.get(u["law"], 0) + 1
         return out, terms
@@ -241,9 +327,9 @@ class Index:
                 lines.append(f"{label.capitalize()}: " + "; ".join(names) + more + ".")
         return "\n".join(lines)
 
-    def context(self, question, extra_terms=(), k=6, max_chars=1800):
+    def context(self, question, extra_terms=(), k=6, max_chars=1800, hints=()):
         """The sources to give the model: records of named laws first, then the articles found."""
-        units, terms = self.search(question, extra_terms, k=k)
+        units, terms = self.search(question, extra_terms, k=k, hints=hints)
         sources = []
         for lid in self.mentioned(question)[:3]:
             law = self.laws[lid]
@@ -252,12 +338,7 @@ class Index:
                             "eli": eli_url(law["eli"]), "text": self.law_record(lid)})
         for u in units:
             law = self.laws.get(u["law"], {"title": u["law"], "eli": None})
-            text = u["text"]
-            if len(text) > max_chars:
-                body = norm(text)
-                pos = min([body.find(t) for t in terms if body.find(t) > 0] or [0])
-                start = max(0, pos - max_chars // 3)
-                text = ("…" if start else "") + text[start:start + max_chars] + "…"
+            text = best_window(u["text"], terms, max_chars)
             sources.append({"kind": "article", "law": u["law"], "title": law["title"], "unit": u["unit"],
                             "where": JUR_NAMES.get(law.get("jur"), law.get("jur")), "status": STATUS_ES.get(law.get("status"), "otro"),
                             "context": u["context"], "since": u["since"], "eli": eli_url(law.get("eli")), "text": text})

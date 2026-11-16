@@ -4,6 +4,7 @@ Scenario 1 (plain LLM): the model answers from what it already knows, with no
 retrieval. Retrieval over LKG 2.0 (RAG / MCP) will be added as other scenarios.
 """
 import os
+import re
 
 import httpx
 
@@ -43,11 +44,10 @@ def _post(url, body, headers, timeout):
     return r.json()
 
 
-def ask_ollama(cfg, question, system, temperature, timeout):
+def ask_ollama(cfg, turns, system, temperature, timeout):
     url = cfg.get("url", "http://localhost:11434").rstrip("/")
     model = cfg["model"]
-    body = {"model": model, "stream": False,
-            "messages": [{"role": "system", "content": system}, {"role": "user", "content": question}]}
+    body = {"model": model, "stream": False, "messages": [{"role": "system", "content": system}] + turns}
     body["options"] = {"num_ctx": cfg.get("num_ctx", 8192)}   # Ollama's default context is too short for RAG prompts
     if temperature is not None:
         body["options"]["temperature"] = temperature
@@ -63,10 +63,9 @@ def ask_ollama(cfg, question, system, temperature, timeout):
     return data["message"]["content"], "ollama", model
 
 
-def ask_anthropic(cfg, question, system, temperature, timeout):
+def ask_anthropic(cfg, turns, system, temperature, timeout):
     model = cfg["model"]
-    body = {"model": model, "max_tokens": cfg.get("max_tokens", 1024), "system": system,
-            "messages": [{"role": "user", "content": question}]}
+    body = {"model": model, "max_tokens": cfg.get("max_tokens", 1024), "system": system, "messages": turns}
     if temperature is not None:
         body["temperature"] = temperature
     headers = {"x-api-key": _key("anthropic"), "anthropic-version": "2023-06-01"}
@@ -74,9 +73,9 @@ def ask_anthropic(cfg, question, system, temperature, timeout):
     return "".join(b.get("text", "") for b in data.get("content", [])), "anthropic", model
 
 
-def ask_openai(cfg, question, system, temperature, timeout):
+def ask_openai(cfg, turns, system, temperature, timeout):
     model = cfg["model"]
-    body = {"model": model, "messages": [{"role": "system", "content": system}, {"role": "user", "content": question}]}
+    body = {"model": model, "messages": [{"role": "system", "content": system}] + turns}
     if temperature is not None:
         body["temperature"] = temperature
     headers = {"Authorization": f"Bearer {_key('openai')}"}
@@ -84,10 +83,10 @@ def ask_openai(cfg, question, system, temperature, timeout):
     return data["choices"][0]["message"]["content"], "openai", model
 
 
-def ask_gemini(cfg, question, system, temperature, timeout):
+def ask_gemini(cfg, turns, system, temperature, timeout):
     model = cfg["model"]
-    body = {"systemInstruction": {"parts": [{"text": system}]},
-            "contents": [{"role": "user", "parts": [{"text": question}]}]}
+    body = {"systemInstruction": {"parts": [{"text": system}]},   # Gemini calls the assistant role "model"
+            "contents": [{"role": "model" if t["role"] == "assistant" else "user", "parts": [{"text": t["content"]}]} for t in turns]}
     if temperature is not None:
         body["generationConfig"] = {"temperature": temperature}
     headers = {"x-goog-api-key": _key("gemini")}
@@ -99,12 +98,12 @@ def ask_gemini(cfg, question, system, temperature, timeout):
 FRONTIER = {"anthropic": ask_anthropic, "openai": ask_openai, "gemini": ask_gemini}
 
 
-def describe(config, mode):
+def describe(config, mode, model=None):
     """Which provider and model a question would go to, without calling it."""
     if mode == "local":
-        return "ollama", config["local"]["model"]
+        return "ollama", model or config["local"]["model"]
     f = config["frontier"]
-    return f["provider"], f["model"]
+    return f["provider"], model or f["model"]
 
 
 RAG_PROMPT = (
@@ -117,20 +116,46 @@ RAG_PROMPT = (
 )
 
 REWRITE_PROMPT = (
-    "Devuelve entre 4 y 10 términos de búsqueda en español, separados por comas, que probablemente aparezcan "
-    "en el texto del artículo de ley que responde a la pregunta. Usa el vocabulario de las leyes (por ejemplo "
-    "«arrendamiento» en vez de «alquiler», «trabajador» en vez de «empleado»). No incluyas nombres ni números "
-    "de leyes. Escribe solo los términos."
+    "Prepara una búsqueda en una base de datos de legislación española. Responde solo con estas dos líneas:\n"
+    "TÉRMINOS: entre 4 y 10 términos en español, separados por comas, que probablemente aparezcan en el texto del "
+    "artículo de ley que responde a la pregunta. Usa el vocabulario de las leyes (por ejemplo «arrendamiento» en vez "
+    "de «alquiler», «trabajador» en vez de «empleado»).\n"
+    "NORMAS: hasta tres normas españolas que probablemente regulan la cuestión, separadas por punto y coma, por su "
+    "nombre habitual o su número (por ejemplo «Estatuto de los Trabajadores; Ley 29/1994»). Si no lo sabes, deja "
+    "esta línea vacía. No indiques artículos."
 )
 
 
-def ask(config, question, mode, system=None):
+def parse_rewrite(text):
+    """The model's reply to REWRITE_PROMPT as (search terms, law names). A reply without the two labels is all terms."""
+    terms, laws = text, ""
+    m = re.search(r"NORMAS\s*:(.*)", text, re.I | re.S)
+    if m:
+        laws, terms = m.group(1), text[:m.start()]
+    terms = re.sub(r"T[ÉE]RMINOS\s*:", "", terms, flags=re.I)
+    clean = lambda parts: [w.strip(" .-*«»\"\n") for w in parts if w.strip(" .-*«»\"\n")]
+    return clean(terms.replace("\n", ",").split(","))[:12], clean(re.split(r"[;\n]", laws))[:3]
+
+
+CITATION_PROMPT = (
+    " Al final de tu respuesta, añade una sección que empiece exactamente por «REFERENCIAS:» y enumere, una por "
+    "línea, cada norma y artículo en que te basas, con este formato:\n- [nombre de la norma], art. [número y apartado]"
+)
+
+
+def ask(config, question, mode, system=None, history=None, model=None):
+    """Send one question to the configured model. Returns (answer, provider, model).
+
+    history: earlier turns of the conversation, [{"role": "user" | "assistant", "content": "..."}, ...].
+    model: use this model instead of the one in config.yaml (same provider).
+    """
     system = system or config.get("system_prompt") or SYSTEM_PROMPT
     temperature = config.get("temperature", 0)
     timeout = config.get("timeout", 120)
+    turns = list(history or []) + [{"role": "user", "content": question}]
     if mode == "local":
-        return ask_ollama(config["local"], question, system, temperature, timeout)
+        return ask_ollama(dict(config["local"], **({"model": model} if model else {})), turns, system, temperature, timeout)
     provider = config["frontier"]["provider"]
     if provider not in FRONTIER:
         raise ModelError(f"Unknown frontier provider {provider!r}: use anthropic, openai or gemini.")
-    return FRONTIER[provider](config["frontier"], question, system, temperature, timeout)
+    return FRONTIER[provider](dict(config["frontier"], **({"model": model} if model else {})), turns, system, temperature, timeout)
