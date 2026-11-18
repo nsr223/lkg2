@@ -26,6 +26,7 @@ import retrieve  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CONFIG = pathlib.Path(os.environ.get("LKG_CONFIG", ROOT / "config.yaml"))
+EXAMPLE_CONFIG = ROOT / "config.example.yaml"   # committed defaults; config.yaml is your own copy (not committed)
 MODES = ("local", "frontier")
 SCENARIOS = ("plain-llm", "rag", "rag-graph")
 _index = {}
@@ -43,8 +44,10 @@ def load_env(path=ROOT / ".env"):
 
 
 def load_config():
-    """Read config.yaml on every request, so edits apply without a restart."""
-    with open(CONFIG, encoding="utf-8") as f:
+    """Read config.yaml on every request, so edits apply without a restart.
+    Without a config.yaml, the committed defaults in config.example.yaml are used."""
+    path = CONFIG if CONFIG.exists() or "LKG_CONFIG" in os.environ else EXAMPLE_CONFIG
+    with open(path, encoding="utf-8") as f:
         config = yaml.safe_load(f) or {}
     if config.get("mode") not in MODES:
         raise HTTPException(500, f"config.yaml: mode must be one of {MODES}.")

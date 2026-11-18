@@ -41,7 +41,7 @@ data/eli/*.json            the BOE's official ELI metadata, 16 files
 data/hist/*.json.gz        article-by-article versions, packed in 16 gzip files (+ index.json)
 scripts/                   everything needed to rebuild data/ from legalize-es and EuroVoc
 server/                    the local Q&A service (FastAPI): /api/qa, and the page itself
-config.yaml                which model the Q&A service uses
+config.example.yaml        default settings (copy to config.yaml for your own; config.yaml is not committed)
 ```
 
 ## Q&A service (runs on your computer)
@@ -56,7 +56,8 @@ python server/app.py              # open http://localhost:8000  (API docs at /do
 
 The server listens on `localhost` only. It serves the page and its data (nothing else from the folder) and the API.
 
-**Choosing the model** (`config.yaml`, read on every question, so no restart is needed):
+**Choosing the model**: copy `config.example.yaml` to `config.yaml` and edit that (it is read on every question, so no
+restart is needed, and git ignores it). Without a `config.yaml`, the server uses the defaults in `config.example.yaml`.
 
 - `mode: local` uses [Ollama](https://ollama.com) on your computer: install it, run `ollama pull qwen2.5:7b`
   (or `llama3.1:8b`, `gemma2:9b`, …) and set `local.model`.

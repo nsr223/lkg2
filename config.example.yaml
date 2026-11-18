@@ -1,5 +1,6 @@
 # Settings for the LKG 2.0 Q&A service (server/app.py).
 # Changes apply to the next question; no restart needed.
+# Copy this file to config.yaml and edit the copy: config.yaml is not committed (git ignores it).
 
 # How questions are answered: "plain-llm" (the model alone, from memory), "rag" (LKG 2.0 is searched first and
 # the articles found are given to the model) or "rag-graph" (the same, and links from the best articles are
