@@ -8,6 +8,22 @@ hierarchy of legal norms, linked to each other and described as ELI linked data.
 
 **Live page:** https://nsr223.github.io/lkg2/
 
+## Quick start (Q&A service on your computer)
+
+```bash
+git clone https://github.com/nsr223/lkg2.git && cd lkg2
+pip install -r server/requirements.txt
+python3 scripts/build_search.py data/laws.json data/hist - search.db   # search database, about 90 seconds
+ollama pull qwen2.5:7b                                                 # needs Ollama: https://ollama.com
+python server/app.py                                                   # then open http://localhost:8000
+```
+
+Choose the scenario in the Q&A tab (model alone, with LKG 2.0 search, or with the graph) and ask a question.
+This search database covers the ~10,000 consolidated laws; the full one, with laws that only have their original
+text, is described below. Optional: search by meaning, with `ollama pull bge-m3` and then
+`python scripts/build_vectors.py search.db --jur es` (a few hours; can be stopped and resumed).
+Settings are in `config.example.yaml`; to change them, copy it to `config.yaml` and edit the copy.
+
 ## What it does
 
 - **Search** by title, number or subject, accent-insensitive; also in English through EuroVoc labels.
@@ -106,8 +122,9 @@ python server/ask_all.py --questions path/to/benchmark.jsonl --scenario rag --mo
   numbered paragraph the cut starts in.
 - `rag-graph` (scenario 3): as `rag`, and links from the best articles are followed (see below).
 
-`rag` needs the search database, `search.db` (about 1 GB, not in git). Download the ready-made one from the
-[release](https://github.com/nsr223/lkg2/releases/tag/search-db-2026-11-15) (about 700 MB):
+`rag` needs the search database, `search.db` (about 1 GB, not in git). Once the
+[release](https://github.com/nsr223/lkg2/releases/tag/search-db-2026-11-15) is published (not yet), the ready-made one
+can be downloaded (about 700 MB):
 
 ```bash
 python scripts/get_search_db.py
