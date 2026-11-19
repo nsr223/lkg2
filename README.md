@@ -112,15 +112,18 @@ python server/ask_all.py --questions path/to/benchmark.jsonl --scenario rag --mo
 **Three scenarios** (`scenario` in `config.yaml`, or `"scenario"` in the request; the Q&A tab has a selector):
 
 - `plain-llm` (scenario 1): the model answers from its own knowledge.
-- `rag` (scenario 2): LKG 2.0 is searched first and the model answers from what is found: the articles in force that
-  best match the question, plus a record of any law the question names (status, repealed by, amended by, from the links
-  in the graph). The model is told to cite them as [1], [2]…; the response lists them in `sources` with their ELI.
+- `rag` (scenario 2, text only): the articles are searched first and the model answers from what is found: the
+  articles in force that best match the question, each with only its law's title and the article's name. Nothing from
+  the knowledge graph is added. The model is told to cite them as [1], [2]…; the response lists them in `sources` with their ELI.
   Optionally the model first suggests legal search terms (`rag.rewrite_query`), so "alquiler" also finds "arrendamiento",
   and the laws that probably govern the question (`rag.suggest_laws`), which are then searched article by article.
   A model often knows which law applies even when it does not remember the current text of the article.
   Long articles are cut to the paragraphs that best match the search (`rag.max_chars`), with a note saying which
   numbered paragraph the cut starts in.
-- `rag-graph` (scenario 3): as `rag`, and links from the best articles are followed (see below).
+- `rag-graph` (scenario 3, text + knowledge graph): the same search, plus what LKG 2.0's graph adds: a record of each
+  law the question names (rank, scope, status, amended by, repealed by), each article's scope, status and the date its
+  current version took effect, and articles reached by following links from the best results (see below).
+  Scenarios 2 and 3 use the same articles, prompt and model, so the difference between them measures the graph.
 
 `rag` needs the search database, `search.db` (about 1 GB, not in git). Once the
 [release](https://github.com/nsr223/lkg2/releases/tag/search-db-2026-11-15) is published (not yet), the ready-made one

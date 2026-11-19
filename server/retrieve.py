@@ -449,8 +449,12 @@ class Index:
                 lines.append(f"{label.capitalize()}: " + "; ".join(names) + more + ".")
         return "\n".join(lines)
 
-    def context(self, question, extra_terms=(), k=6, max_chars=1800, hints=(), qvec=None, sem_weight=1.0, earlier=None, graph=None):
-        """The sources to give the model: records of named laws first, then the articles found.
+    def context(self, question, extra_terms=(), k=6, max_chars=1800, hints=(), qvec=None, sem_weight=1.0, earlier=None, graph=None,
+                records=True):
+        """The sources to give the model: records of named laws first (only with records=True), then the articles found.
+
+        records: add a record of each law the question names (rank, scope, status and its links in the graph).
+        Scenario 2 (text only) passes False; scenario 3 passes True.
 
         earlier: in a conversation, (first question, its vector or None). The first question is searched alone
         and keeps half of the places, so a later message (which may be wrong, or off the subject) can add
@@ -469,7 +473,7 @@ class Index:
             if extra:
                 units = units[:max(0, k - len(extra))] + extra
         sources = []
-        for lid in self.mentioned(question)[:3]:
+        for lid in (self.mentioned(question)[:3] if records else []):
             law = self.laws[lid]
             sources.append({"kind": "law", "law": lid, "title": law["title"], "unit": "", "where": JUR_NAMES.get(law["jur"], law["jur"]),
                             "status": STATUS_ES.get(law["status"], "otro"),

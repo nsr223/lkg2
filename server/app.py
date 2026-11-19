@@ -156,19 +156,24 @@ def qa(q: Question):
                 raise HTTPException(500, f"config.yaml: rag.semantic.model must be {index.vectors.meta['model']!r}, the model "
                                          "the article vectors were built with (scripts/build_vectors.py).")
             vec = (lambda text: llm.embed(sem, text)) if use_sem else (lambda text: None)
+            # scenario 2 (rag) is text only: the articles found, each with its law's title and the article's name.
+            # Scenario 3 (rag-graph) adds what comes from the knowledge graph: records of the laws the question names
+            # (rank, scope, status, amended or repealed by), each article's scope, status and version date, and linked articles.
+            kg = scenario == "rag-graph"
             users = [t["content"] for t in history if t["role"] == "user"]
             found, terms = index.context(asked, extra, k=rag.get("results", 6), max_chars=rag.get("max_chars", 1800), hints=hints,
                                          qvec=vec(asked), sem_weight=sem.get("weight", 1.0),
                                          earlier=(users[0], vec(users[0])) if users else None,
-                                         graph=(rag.get("graph") or {}) if scenario == "rag-graph" else None)
+                                         graph=(rag.get("graph") or {}) if kg else None, records=kg)
             sources = [dict(s, n=i + 1, url=f"https://www.boe.es/buscar/act.php?id={s['law']}") for i, s in enumerate(found)]
             blocks = []
             for s in sources:
                 head = s["title"] + (f" — {s['unit']}" if s["unit"] else " — ficha de la norma (LKG 2.0)")
-                info = [f"ámbito: {s['where']}", s["status"]] + ([f"versión vigente desde {s['since']}"] if s.get("since") else [])
-                if s.get("via"):
-                    info.append("enlazado: " + s["via"])
-                head += " (" + "; ".join(info) + ")"
+                if kg:
+                    info = [f"ámbito: {s['where']}", s["status"]] + ([f"versión vigente desde {s['since']}"] if s.get("since") else [])
+                    if s.get("via"):
+                        info.append("enlazado: " + s["via"])
+                    head += " (" + "; ".join(info) + ")"
                 blocks.append(f"[{s['n']}] {head}\n{s['text']}")
             prompt = "Fragmentos:\n\n" + "\n\n".join(blocks) + f"\n\nPregunta: {question}"
             system = (config.get("rag_prompt") or llm.RAG_PROMPT) + cite
