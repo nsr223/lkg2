@@ -47,26 +47,13 @@ def _text_calls(content):
 
 def chat(cfg, messages, tools, temperature, timeout):
     """One round with Ollama's chat API, with tools offered. Returns the assistant message (dict)."""
-    url = cfg.get("url", "http://localhost:11434").rstrip("/")
-    model = cfg["model"]
-    body = {"model": model, "stream": False, "messages": messages,
+    body = {"model": cfg["model"], "stream": False, "messages": messages,
             "options": {"num_ctx": cfg.get("num_ctx_tools", max(16384, cfg.get("num_ctx", 8192)))}}
     if tools:
         body["tools"] = tools
     if temperature is not None:
         body["options"]["temperature"] = temperature
-    try:
-        data = llm._post(f"{url}/api/chat", body, {}, timeout)
-    except llm.ModelError as e:
-        msg = str(e)
-        if msg.startswith("Could not connect"):
-            msg = f"Could not reach Ollama at {url}. Is it running (ollama serve)?"
-        elif "does not support tools" in msg:
-            msg = f"The model {model} does not support tool calling in Ollama; scenario 3b needs one that does (e.g. qwen2.5)."
-        elif "not found" in msg:
-            msg = f"Ollama does not have the model {model}. Run: ollama pull {model}"
-        raise llm.ModelError(msg) from None
-    return data["message"]
+    return llm.ollama_chat(cfg, body, timeout)
 
 
 def run(config, tools, question, history=(), model=None, system_extra=""):

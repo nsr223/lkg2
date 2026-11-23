@@ -35,6 +35,7 @@ local:
   url: http://localhost:11434
   num_ctx: 8192                  # context length; RAG prompts need more than Ollama's default
   num_ctx_tools: 16384           # context length for graph-tools, where tool results add up over several rounds
+  think: false                   # thinking models (qwen3 and later) answer directly instead of thinking first
 
 frontier:
   provider: anthropic            # anthropic, openai or gemini

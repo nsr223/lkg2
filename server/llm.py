@@ -44,23 +44,46 @@ def _post(url, body, headers, timeout):
     return r.json()
 
 
-def ask_ollama(cfg, turns, system, temperature, timeout):
+_NO_THINK_FIELD = set()   # models that reject Ollama's "think" setting (they do not think anyway)
+THINK_TAGS = re.compile(r"<think>.*?</think>\s*", re.S)
+
+
+def ollama_chat(cfg, body, timeout):
+    """POST to Ollama's chat API. Thinking models (e.g. qwen3) think before answering unless told not to, which is
+    slow and can leak into the answer; local.think (default false) is sent as Ollama's "think" setting. Models
+    without thinking reject the setting, so it is dropped for them. Returns the assistant message, without any
+    <think>...</think> text."""
     url = cfg.get("url", "http://localhost:11434").rstrip("/")
+    model = body["model"]
+    if model not in _NO_THINK_FIELD:
+        body = dict(body, think=bool(cfg.get("think", False)))
+    try:
+        data = _post(f"{url}/api/chat", body, {}, timeout)
+    except ModelError as e:
+        msg = str(e)
+        if "think" in body and "does not support thinking" in msg:
+            _NO_THINK_FIELD.add(model)
+            return ollama_chat(cfg, {k: v for k, v in body.items() if k != "think"}, timeout)
+        if msg.startswith("Could not connect"):
+            msg = f"Could not reach Ollama at {url}. Is it running (ollama serve)?"
+        elif "does not support tools" in msg:
+            msg = f"The model {model} does not support tool calling in Ollama; scenario 3b needs one that does (e.g. qwen2.5)."
+        elif "not found" in msg:
+            msg = f"Ollama does not have the model {model}. Run: ollama pull {model}"
+        raise ModelError(msg) from None
+    message = data["message"]
+    if message.get("content"):
+        message["content"] = THINK_TAGS.sub("", message["content"])
+    return message
+
+
+def ask_ollama(cfg, turns, system, temperature, timeout):
     model = cfg["model"]
     body = {"model": model, "stream": False, "messages": [{"role": "system", "content": system}] + turns}
     body["options"] = {"num_ctx": cfg.get("num_ctx", 8192)}   # Ollama's default context is too short for RAG prompts
     if temperature is not None:
         body["options"]["temperature"] = temperature
-    try:
-        data = _post(f"{url}/api/chat", body, {}, timeout)
-    except ModelError as e:
-        msg = str(e)
-        if msg.startswith("Could not connect"):
-            msg = f"Could not reach Ollama at {url}. Is it running (ollama serve)?"
-        elif "not found" in msg:
-            msg = f"Ollama does not have the model {model}. Run: ollama pull {model}"
-        raise ModelError(msg) from None
-    return data["message"]["content"], "ollama", model
+    return ollama_chat(cfg, body, timeout)["content"], "ollama", model
 
 
 def ask_anthropic(cfg, turns, system, temperature, timeout):
