@@ -61,10 +61,11 @@ mcp = Server("lkg2", instructions=(
 
 
 @mcp.tool()
-def search_articles(query: str, law: str | None = None) -> str:
-    """Search current Spanish legislation for the articles that answer a question (words and meaning).
-    query: the question or legal terms, in Spanish. law: optional, limit to one law by name or number ("Ley 29/1994")."""
-    return tools().search_articles(query, law)[0]
+def search_articles(query: str, law: str | None = None, date: str | None = None) -> str:
+    """Search Spanish legislation for the articles that answer a question (words and meaning).
+    query: the question or legal terms, in Spanish. law: optional, limit to one law by name or number ("Ley 29/1994").
+    date: optional YYYY-MM-DD; the extracts then show each article as it read on that date."""
+    return tools().search_articles(query, law, date)[0]
 
 
 @mcp.tool()

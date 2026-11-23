@@ -38,11 +38,13 @@ KINDS = {"da": "Disposición adicional", "dt": "Disposición transitoria", "df":
 
 TOOL_SPECS = [
     {"name": "search_articles",
-     "description": "Busca artículos de la legislación española vigente que respondan a una pregunta. Devuelve los mejores "
-                    "artículos con un extracto. Úsalo primero si no sabes qué norma o artículo aplica.",
+     "description": "Busca artículos de la legislación española que respondan a una pregunta. Devuelve los mejores "
+                    "artículos con un extracto. Úsalo primero si no sabes qué norma o artículo aplica. Con «date» los "
+                    "extractos muestran el texto vigente en esa fecha.",
      "parameters": {"type": "object", "properties": {
          "query": {"type": "string", "description": "La pregunta o los términos jurídicos a buscar, en español."},
-         "law": {"type": "string", "description": "Opcional: limitar a una norma, por nombre o número (p. ej. «Estatuto de los Trabajadores», «Ley 29/1994»)."}},
+         "law": {"type": "string", "description": "Opcional: limitar a una norma, por nombre o número (p. ej. «Estatuto de los Trabajadores», «Ley 29/1994»)."},
+         "date": {"type": "string", "description": "Opcional: fecha AAAA-MM-DD; los extractos muestran la versión vigente en esa fecha."}},
          "required": ["query"]}},
     {"name": "get_article",
      "description": "Devuelve el texto de un artículo de una norma, con la lista de sus versiones (fechas y normas que lo modificaron). "
@@ -184,7 +186,23 @@ class Tools:
         return paras[0] + "\n\n" + "\n\n".join(paras[start:end])
 
     # --- the four tools --------------------------------------------------------------------------
-    def search_articles(self, query, law=None):
+    def text_at(self, lid, unit, date):
+        """(text, since) of an article as it read on `date` from its history; (None, None) if there is no history,
+        ("", None) if the article did not exist yet."""
+        H = self.history(lid)
+        if not H:
+            return None, None
+        name = self.find_unit(H["units"].keys(), unit)
+        if not name:
+            return None, None
+        chosen = ("", None)
+        for vi, ti in H["units"][name]:
+            v = H["versions"][vi]
+            if v["d"] <= date:
+                chosen = (H["texts"][ti], v["d"])
+        return chosen
+
+    def search_articles(self, query, law=None, date=None):
         hints = [law] if law else []
         qvec = self.embed(query) if self.embed else None
         units, terms = self.ix.search(query, k=6, hints=hints, qvec=qvec)
@@ -194,14 +212,26 @@ class Tools:
                 units = [u for u in units if u["law"] == lid] or units
         if not units:
             return "No se ha encontrado ningún artículo.", []
+        if date and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+            date = None
         lines, seen = [], []
         for u in units:
             L = self.ix.laws.get(u["law"], {})
-            snip = best_window(clean(u["text"]), terms, SNIPPET)
-            lines.append(f"- {L.get('title', u['law'])} ({u['law']}) — {u['unit']} "
+            text, when = u["text"], ""
+            if date:   # the search finds articles by today's text; show each as it read on the date asked
+                old, since = self.text_at(u["law"], u["unit"], date)
+                if old is None:
+                    when = " (sin historial: texto actual)"
+                elif old == "":
+                    when = f" (no existía el {date})"
+                    text = ""
+                else:
+                    text, when = old, f" (versión vigente el {date}, desde {since})"
+            snip = best_window(clean(text), terms, SNIPPET) if text else ""
+            lines.append(f"- {L.get('title', u['law'])} ({u['law']}) — {u['unit']}{when} "
                          f"[{JUR_NAMES.get(L.get('jur'), L.get('jur'))}, {STATUS_ES.get(L.get('status'), 'otro')}]\n  {snip}")
-            seen.append({"law": u["law"], "unit": u["unit"], "via": "search_articles"})
-        return "Resultados:\n" + "\n".join(lines), seen
+            seen.append({"law": u["law"], "unit": u["unit"], "via": "search_articles" + (f" {date}" if date else "")})
+        return "Resultados" + (f" (textos vigentes el {date})" if date else "") + ":\n" + "\n".join(lines), seen
 
     def get_article(self, law, article, date=None, apartado=None):
         lid = self.law_id(law)

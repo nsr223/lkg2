@@ -187,7 +187,7 @@ so the two scenarios can be compared.
 
 | Tool | What it returns |
 | --- | --- |
-| `search_articles(query, law?)` | the articles in force that best match (the scenario 2 search), with an extract |
+| `search_articles(query, law?, date?)` | the articles that best match (the scenario 2 search), with an extract; with `date`, each extract shows the article as it read on that date |
 | `get_article(law, article, date?, apartado?)` | the article's text, today or as it read on `date`, and the list of its versions with the laws that changed it (from `data/hist`) |
 | `get_law(law)` | the law's record: rank, scope, in force or repealed, amended or repealed by, years of history |
 | `get_links(law, article)` | the articles its text refers to, and the laws officially linked to its law |
