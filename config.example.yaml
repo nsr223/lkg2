@@ -13,6 +13,8 @@ rag:
   rewrite_query: true            # ask the model for legal search terms first (finds "arrendamiento" for "alquiler")
   suggest_laws: true             # ...and for the laws that probably govern the question, to search inside them
   max_chars: 1800                # longest piece of one article given to the model (long articles are cut to the best part)
+  fix_citations: true           # if the model puts the wrong [n] next to an article it names, correct it to the right source
+                                 # (the answer before the fix is kept in answer_original)
   semantic:                      # search by meaning as well as by words; used only if scripts/build_vectors.py has been run
     enabled: true
     model: bge-m3                # local embedding model in Ollama (ollama pull bge-m3); must be the one the vectors were built with

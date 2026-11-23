@@ -89,6 +89,10 @@ for x in items:
             if j.get("sources"):
                 rec["sources"] = [{"n": s["n"], "law": s["law"], "unit": s["unit"], "eli": s.get("eli"), "via": s.get("via")} for s in j["sources"]]
                 rec["search_terms"] = j.get("search_terms", [])
+            if j.get("citation_check"):
+                rec["citation_check"] = j["citation_check"]
+            if j.get("answer_original"):
+                rec["answer_original"] = j["answer_original"]
         else:
             rec.update(answer="", error=j.get("detail", r.text))
     except httpx.HTTPError as e:

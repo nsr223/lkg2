@@ -21,6 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import cites  # noqa: E402
 import llm  # noqa: E402
 import retrieve  # noqa: E402
 
@@ -101,6 +102,8 @@ class Answer(BaseModel):
     seconds: float
     sources: list[Source] = []
     search_terms: list[str] = []
+    answer_original: str | None = Field(None, description="the model's answer before bracket numbers were corrected (only if any were)")
+    citation_check: list[dict] = Field([], description="bracket numbers that did not match the article named next to them")
 
 
 app = FastAPI(title="LKG 2.0 Q&A", version="0.1",
@@ -180,7 +183,12 @@ def qa(q: Question):
             answer, provider, model = llm.ask(config, prompt, mode, system=system, history=history, model=q.model)
     except llm.ModelError as e:
         raise HTTPException(503, str(e)) from None
-    return Answer(question=q.question, answer=answer.strip(), scenario=scenario, mode=mode, provider=provider, model=model,
+    answer, original, notes = answer.strip(), None, []
+    if sources and config.get("rag", {}).get("fix_citations", True):
+        fixed, notes = cites.check(answer, sources)
+        if fixed != answer:
+            answer, original = fixed, answer
+    return Answer(question=q.question, answer=answer, answer_original=original, citation_check=notes, scenario=scenario, mode=mode, provider=provider, model=model,
                   seconds=round(time.perf_counter() - start, 2), sources=[Source(**{k: s.get(k) for k in Source.model_fields}) for s in sources],
                   search_terms=terms)
 
