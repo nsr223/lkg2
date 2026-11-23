@@ -275,7 +275,7 @@ const T = {
     qaTitle: "Preguntas sobre la legislación", qaIntro: "Haz una pregunta sobre derecho español. Puede responder el modelo solo, de memoria (escenario 1), o primero se buscan en LKG 2.0 los artículos vigentes que mejor encajan y el modelo responde a partir de ellos (escenario 2, RAG). Las respuestas pueden contener errores: comprueba siempre el texto en el BOE.",
     qaAsk: "Preguntar", qaBusy: "Pensando…", qaPh: "Escribe tu pregunta (p. ej. «¿Cuánta fianza hay que dar al alquilar una vivienda?»)",
     qaChecking: "Buscando el servidor de preguntas…", qaOn: (m, p, mode) => `Responde: ${m} (${p}, ${mode === "local" ? "modelo local" : "modelo en la nube"}).`,
-    qaScen: {"plain-llm": "Solo el modelo (escenario 1)", "rag": "Con LKG 2.0 (RAG, escenario 2)", "rag-graph": "Con LKG 2.0 y sus enlaces (escenario 3)"}, qaUsed: "Fragmentos de LKG 2.0 dados al modelo:", qaCard: "ficha de la norma",
+    qaScen: {"plain-llm": "Solo el modelo (escenario 1)", "rag": "Con LKG 2.0 (RAG, escenario 2)", "rag-graph": "Con LKG 2.0 y sus enlaces (escenario 3a)", "graph-tools": "El modelo consulta LKG 2.0 con herramientas (escenario 3b)"}, qaUsed: "Fragmentos de LKG 2.0 dados al modelo:", qaCard: "ficha de la norma",
     qaOff: "Las preguntas necesitan el servidor de LKG 2.0 en tu ordenador. Instálalo y arráncalo con", qaOff2: "y abre http://localhost:8000. Instrucciones en el README de GitHub.",
     qaDemoTitle: "Preguntas de ejemplo", qaDemoNote: "Con su respuesta de referencia, comprobada en el texto del BOE. Pulsa una pregunta para hacérsela al modelo.",
     qaRef: "Respuesta de referencia:", qaSrc: "Fuente:", qaMeta: (m, p, s) => `${m} (${p}) · ${s} s`, qaFail: "No se pudo obtener respuesta.",
@@ -325,7 +325,7 @@ const T = {
     qaTitle: "Questions about the legislation", qaIntro: "Ask a question about Spanish law. The model can answer alone, from memory (scenario 1), or LKG 2.0 is searched first for the articles in force that fit best and the model answers from them (scenario 2, RAG). Answers may contain errors: always check the text in the BOE.",
     qaAsk: "Ask", qaBusy: "Thinking…", qaPh: "Type your question (e.g. “How much deposit must be paid when renting a home?”)",
     qaChecking: "Looking for the Q&A server…", qaOn: (m, p, mode) => `Answering: ${m} (${p}, ${mode === "local" ? "local model" : "hosted model"}).`,
-    qaScen: {"plain-llm": "Model only (scenario 1)", "rag": "With LKG 2.0 (RAG, scenario 2)", "rag-graph": "With LKG 2.0 and its links (scenario 3)"}, qaUsed: "LKG 2.0 passages given to the model:", qaCard: "law record",
+    qaScen: {"plain-llm": "Model only (scenario 1)", "rag": "With LKG 2.0 (RAG, scenario 2)", "rag-graph": "With LKG 2.0 and its links (scenario 3a)", "graph-tools": "The model queries LKG 2.0 with tools (scenario 3b)"}, qaUsed: "LKG 2.0 passages given to the model:", qaCard: "law record",
     qaOff: "Questions need the LKG 2.0 server running on your computer. Install and start it with", qaOff2: "and open http://localhost:8000. Instructions in the GitHub README.",
     qaDemoTitle: "Example questions", qaDemoNote: "With a reference answer checked against the BOE text. Click a question to ask the model.",
     qaRef: "Reference answer:", qaSrc: "Source:", qaMeta: (m, p, s) => `${m} (${p}) · ${s} s`, qaFail: "No answer could be obtained.",
@@ -994,7 +994,7 @@ function qaRender(){
   else { s.classList.add("off"); s.replaceChildren(t("qaOff") + " ", el("code", {text: "pip install -r server/requirements.txt && python server/app.py"}), " " + t("qaOff2")); }
   const off = !qa.info;
   const sel = $("#qaScen"); sel.hidden = !(qa.info && qa.info.rag_available);
-  sel.replaceChildren(...["plain-llm", "rag", "rag-graph"].map(v => { const o = el("option", {value: v, text: t("qaScen")[v]}); if (v === qa.scen) o.selected = true; return o; }));
+  sel.replaceChildren(...["plain-llm", "rag", "rag-graph", "graph-tools"].map(v => { const o = el("option", {value: v, text: t("qaScen")[v]}); if (v === qa.scen) o.selected = true; return o; }));
   sel.disabled = qa.busy;
   $("#qaQ").disabled = off; $("#qaQ").placeholder = t("qaPh");
   $("#qaGo").disabled = off || qa.busy; $("#qaGo").textContent = qa.busy ? t("qaBusy") : t("qaAsk");

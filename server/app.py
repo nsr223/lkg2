@@ -21,16 +21,19 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import agent  # noqa: E402
 import cites  # noqa: E402
 import llm  # noqa: E402
 import retrieve  # noqa: E402
+import tools  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CONFIG = pathlib.Path(os.environ.get("LKG_CONFIG", ROOT / "config.yaml"))
 EXAMPLE_CONFIG = ROOT / "config.example.yaml"   # committed defaults; config.yaml is your own copy (not committed)
 MODES = ("local", "frontier")
-SCENARIOS = ("plain-llm", "rag", "rag-graph")
+SCENARIOS = ("plain-llm", "rag", "rag-graph", "graph-tools")
 _index = {}
+_tools = {}
 
 
 def load_env(path=ROOT / ".env"):
@@ -73,7 +76,7 @@ class Turn(BaseModel):
 class Question(BaseModel):
     question: str = Field(min_length=1, max_length=4000)
     mode: str | None = Field(None, description="local or frontier; overrides config.yaml for this question")
-    scenario: str | None = Field(None, description="plain-llm, rag or rag-graph; overrides config.yaml for this question")
+    scenario: str | None = Field(None, description="plain-llm, rag, rag-graph or graph-tools; overrides config.yaml for this question")
     model: str | None = Field(None, max_length=100, description="model name; overrides config.yaml for this question (same provider)")
     history: list[Turn] = Field([], max_length=20, description="earlier turns of the conversation, oldest first; "
                                 "'question' is then the latest user message")
@@ -104,6 +107,7 @@ class Answer(BaseModel):
     search_terms: list[str] = []
     answer_original: str | None = Field(None, description="the model's answer before bracket numbers were corrected (only if any were)")
     citation_check: list[dict] = Field([], description="bracket numbers that did not match the article named next to them")
+    tool_calls: list[dict] = Field([], description="scenario 3b: the tools the model called, in order ({tool, args, chars})")
 
 
 app = FastAPI(title="LKG 2.0 Q&A", version="0.1",
@@ -135,9 +139,27 @@ def qa(q: Question):
     history = [t.model_dump() for t in q.history]
     cite = llm.CITATION_PROMPT if q.references else ""
     start = time.perf_counter()
-    sources, terms = [], []
+    sources, terms, trace = [], [], []
     try:
-        if scenario == "plain-llm":
+        if scenario == "graph-tools":
+            # scenario 3b: the model queries LKG 2.0 itself through tools (the same ones server/mcp_server.py offers)
+            if mode != "local":
+                raise HTTPException(422, "graph-tools runs with local models (Ollama) only, for now.")
+            index = get_index(config)
+            if index is None:
+                raise HTTPException(503, "The search database has not been built: run scripts/build_search.py (see the README).")
+            sem = config.get("rag", {}).get("semantic") or {}
+            if str(index) not in _tools:
+                use_sem = index.vectors is not None and sem.get("enabled", True)
+                _tools[str(index)] = tools.Tools(index, ROOT, embed=(lambda text: llm.embed(sem, text)) if use_sem else None)
+            answer, provider, model, seen, trace = agent.run(config, _tools[str(index)], question, history=history, model=q.model,
+                                                            system_extra=cite)
+            for i, s in enumerate(seen):
+                law = index.laws.get(s["law"], {})
+                sources.append({"n": i + 1, "kind": "article", "law": s["law"], "title": law.get("title", s["law"]), "unit": s["unit"],
+                                "eli": retrieve.eli_url(law.get("eli")), "url": f"https://www.boe.es/buscar/act.php?id={s['law']}",
+                                "text": "", "via": s["via"]})
+        elif scenario == "plain-llm":
             system = (config.get("system_prompt") or llm.SYSTEM_PROMPT) + cite
             answer, provider, model = llm.ask(config, question, mode, system=system, history=history, model=q.model)
         else:
@@ -184,13 +206,13 @@ def qa(q: Question):
     except llm.ModelError as e:
         raise HTTPException(503, str(e)) from None
     answer, original, notes = answer.strip(), None, []
-    if sources and config.get("rag", {}).get("fix_citations", True):
+    if sources and scenario != "graph-tools" and config.get("rag", {}).get("fix_citations", True):
         fixed, notes = cites.check(answer, sources)
         if fixed != answer:
             answer, original = fixed, answer
     return Answer(question=q.question, answer=answer, answer_original=original, citation_check=notes, scenario=scenario, mode=mode, provider=provider, model=model,
                   seconds=round(time.perf_counter() - start, 2), sources=[Source(**{k: s.get(k) for k in Source.model_fields}) for s in sources],
-                  search_terms=terms)
+                  search_terms=terms, tool_calls=trace)
 
 
 @app.get("/api/questions")

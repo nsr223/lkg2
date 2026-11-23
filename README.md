@@ -109,7 +109,7 @@ python server/ask_all.py --questions path/to/benchmark.jsonl --out path/to/resul
 python server/ask_all.py --questions path/to/benchmark.jsonl --scenario rag --model llama3.1:8b --out path/to/results.jsonl
 ```
 
-**Three scenarios** (`scenario` in `config.yaml`, or `"scenario"` in the request; the Q&A tab has a selector):
+**Four scenarios** (`scenario` in `config.yaml`, or `"scenario"` in the request; the Q&A tab has a selector):
 
 - `plain-llm` (scenario 1): the model answers from its own knowledge.
 - `rag` (scenario 2, text only): the articles are searched first and the model answers from what is found: the
@@ -120,10 +120,15 @@ python server/ask_all.py --questions path/to/benchmark.jsonl --scenario rag --mo
   A model often knows which law applies even when it does not remember the current text of the article.
   Long articles are cut to the paragraphs that best match the search (`rag.max_chars`), with a note saying which
   numbered paragraph the cut starts in.
-- `rag-graph` (scenario 3, text + knowledge graph): the same search, plus what LKG 2.0's graph adds: a record of each
+- `rag-graph` (scenario 3a, text + knowledge graph in the prompt): the same search, plus what LKG 2.0's graph adds: a record of each
   law the question names (rank, scope, status, amended by, repealed by), each article's scope, status and the date its
   current version took effect, and articles reached by following links from the best results (see below).
-  Scenarios 2 and 3 use the same articles, prompt and model, so the difference between them measures the graph.
+  Scenarios 2 and 3a use the same articles, prompt and model, so the difference between them measures the graph.
+- `graph-tools` (scenario 3b, the model queries the graph): instead of receiving a fixed set of articles, the model
+  calls four tools and decides what to look up: `search_articles`, `get_article` (with an optional date, to read an
+  article as it was then), `get_law` and `get_links`. The same tools are offered to any MCP client by
+  `server/mcp_server.py` (see below). Local models only for now, and the model must support tool calling in Ollama
+  (e.g. qwen2.5, llama3.1).
 
 `rag` needs the search database, `search.db` (about 1 GB, not in git). Once the
 [release](https://github.com/nsr223/lkg2/releases/tag/search-db-2026-11-15) is published (not yet), the ready-made one
@@ -177,6 +182,36 @@ articles found, and the article reached that best matches the question takes the
 An article reached by a link is used only if it shares at least two search terms with the question. The response
 says how each one was reached (`via`), and the model sees it too. The number of sources is the same as in `rag`,
 so the two scenarios can be compared.
+
+**Scenario 3b, `graph-tools`, and the MCP server.** `server/tools.py` turns LKG 2.0 into four tools:
+
+| Tool | What it returns |
+| --- | --- |
+| `search_articles(query, law?)` | the articles in force that best match (the scenario 2 search), with an extract |
+| `get_article(law, article, date?, apartado?)` | the article's text, today or as it read on `date`, and the list of its versions with the laws that changed it (from `data/hist`) |
+| `get_law(law)` | the law's record: rank, scope, in force or repealed, amended or repealed by, years of history |
+| `get_links(law, article)` | the articles its text refers to, and the laws officially linked to its law |
+
+Laws can be named as people name them ("Código Civil", "ET", "Ley 29/1994") or by BOE id; articles as "1964",
+"9 bis", "disposición adicional vigésima octava" or "anexo II".
+
+In scenario 3b (`server/agent.py`) a local model gets these tools through Ollama's tool calling. It may call them
+for up to six rounds and is then asked to answer with what it has. The response lists every call (`tool_calls`)
+and every article the tools showed (`sources`, with `via` saying which tool showed it). The prompt matches the RAG
+prompt except for how to use the tools.
+
+```bash
+python server/ask_all.py --questions ../legal-qa-benchmark/data/noah/questions1.jsonl \
+    --scenario graph-tools --out ../legal-qa-benchmark/results/lkg2_graph_tools.jsonl
+```
+
+The same tools as an MCP server, for Claude Desktop, an IDE or another agent (runs on this computer, over stdio):
+
+```bash
+pip install "mcp>=1.2"
+python server/mcp_server.py      # normally started by the client; example client entry:
+# "mcpServers": {"lkg2": {"command": "python3", "args": ["/path/to/lkg2/server/mcp_server.py"]}}
+```
 
 ## Rebuilding the data
 

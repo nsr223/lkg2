@@ -4,7 +4,8 @@
 
 # How questions are answered: "plain-llm" (the model alone, from memory), "rag" (LKG 2.0 is searched first and
 # the articles found are given to the model) or "rag-graph" (the same, and links from the best articles are
-# followed). rag and rag-graph need the search database (see the README).
+# followed; scenario 3a) or "graph-tools" (the model queries LKG 2.0 itself with tools; scenario 3b, local models
+# that support tool calling). rag, rag-graph and graph-tools need the search database (see the README).
 scenario: plain-llm
 
 rag:
@@ -33,6 +34,7 @@ local:
   model: qwen2.5:7b              # any model pulled with `ollama pull`, e.g. llama3.1:8b, gemma2:9b
   url: http://localhost:11434
   num_ctx: 8192                  # context length; RAG prompts need more than Ollama's default
+  num_ctx_tools: 16384           # context length for graph-tools, where tool results add up over several rounds
 
 frontier:
   provider: anthropic            # anthropic, openai or gemini

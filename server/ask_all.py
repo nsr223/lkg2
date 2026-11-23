@@ -32,7 +32,7 @@ p = argparse.ArgumentParser()
 p.add_argument("--questions", default=str(ROOT / "private" / "questions.json"))
 p.add_argument("--url", default="http://localhost:8000")
 p.add_argument("--mode", choices=["local", "frontier"], help="override config.yaml for this run")
-p.add_argument("--scenario", choices=["plain-llm", "rag", "rag-graph"], help="override config.yaml for this run")
+p.add_argument("--scenario", choices=["plain-llm", "rag", "rag-graph", "graph-tools"], help="override config.yaml for this run")
 p.add_argument("--lang", choices=["es", "en"], default="es", help="language of demo questions")
 p.add_argument("--model", help="model name; overrides config.yaml for this run (same provider)")
 p.add_argument("--label", help='name for this system in the results (default: "lkg2_<mode>", or the --model name)')
@@ -54,7 +54,7 @@ except httpx.HTTPError:
     sys.exit(f"The Q&A server is not running at {a.url}. Start it with: python server/app.py")
 mode = a.mode or info["mode"]
 scenario = a.scenario or info["scenario"]
-label = a.label or (a.model.replace(":", "_").replace("/", "_") if a.model else f"lkg2_{mode}") + {"rag": "_rag", "rag-graph": "_rag_graph"}.get(scenario, "")
+label = a.label or (a.model.replace(":", "_").replace("/", "_") if a.model else f"lkg2_{mode}") + {"rag": "_rag", "rag-graph": "_rag_graph", "graph-tools": "_graph_tools"}.get(scenario, "")
 references = path.suffix == ".jsonl" and not a.no_references
 
 out = pathlib.Path(a.out)
@@ -89,6 +89,8 @@ for x in items:
             if j.get("sources"):
                 rec["sources"] = [{"n": s["n"], "law": s["law"], "unit": s["unit"], "eli": s.get("eli"), "via": s.get("via")} for s in j["sources"]]
                 rec["search_terms"] = j.get("search_terms", [])
+            if j.get("tool_calls"):
+                rec["tool_calls"] = j["tool_calls"]
             if j.get("citation_check"):
                 rec["citation_check"] = j["citation_check"]
             if j.get("answer_original"):
