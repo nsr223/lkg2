@@ -146,6 +146,9 @@ python server/ask_all.py --questions path/to/benchmark.jsonl --scenario rag --mo
 - `rag-graph` (scenario 3a, text + knowledge graph in the prompt): the same search, plus what LKG 2.0's graph adds: a record of each
   law the question names (rank, scope, status, amended by, repealed by), each article's scope, status and the date its
   current version took effect, and articles reached by following links from the best results (see below).
+  If the question asks about a past date ("en 2014", "en marzo de 2020", "antes de 2015"), each article is also given
+  as it read on that date, from the version history, when that text was different (`rag.graph.dated`). Today's text
+  stays too, because a past date in a question may only be when something happened.
   Scenarios 2 and 3a use the same articles, prompt and model, so the difference between them measures the graph.
 - `graph-tools` (scenario 3b, the model queries the graph): instead of receiving a fixed set of articles, the model
   calls four tools and decides what to look up: `search_articles`, `get_article` (with an optional date, to read an

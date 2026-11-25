@@ -13,7 +13,8 @@ rag:
   results: 6                     # articles given to the model
   rewrite_query: true            # ask the model for legal search terms first (finds "arrendamiento" for "alquiler")
   suggest_laws: true             # ...and for the laws that probably govern the question, to search inside them
-  max_chars: 1800                # longest piece of one article given to the model (long articles are cut to the best part)
+  max_chars: 3000                # longest piece of one article given to the model (long articles are cut to the best part);
+                                 # chosen on the 2020 Workers' Statute dataset (legal-qa-benchmark/scripts/tune_rag_2020.py)
   fix_citations: true           # if the model puts the wrong [n] next to an article it names, correct it to the right source
                                  # (the answer before the fix is kept in answer_original)
   semantic:                      # search by meaning as well as by words; used only if scripts/build_vectors.py has been run
@@ -24,6 +25,8 @@ rag:
     weight: 1.0                  # how much meaning counts next to words
   graph:                         # scenario 3 (rag-graph): follow links from the best articles found
     slots: 1                     # how many of the places go to articles reached by a link
+    dated: true                  # if the question asks about a past date ("en 2014", "antes de 2015"), also give each article
+                                 # as it read then, when it was different (from the version history in data/hist)
     links: [text]                # text = articles cited in the text of the best results;
                                  # official = laws officially linked to theirs (developed by, issued under...)
 

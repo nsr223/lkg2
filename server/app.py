@@ -10,6 +10,7 @@ Settings are in config.yaml; API keys go in a .env file (never committed).
 import json
 import os
 import pathlib
+import re
 import sys
 import time
 
@@ -71,6 +72,35 @@ def get_index(config):
     if str(path) not in _index:
         _index[str(path)] = retrieve.Index(path, ROOT / "data" / "laws.json", ROOT / "data" / "refs.json")
     return _index[str(path)]
+
+
+def get_tools(index, config):
+    """The LKG 2.0 tools (version history, links) over the search index, made once."""
+    if str(index) not in _tools:
+        sem = config.get("rag", {}).get("semantic") or {}
+        use_sem = index.vectors is not None and sem.get("enabled", True)
+        _tools[str(index)] = tools.Tools(index, ROOT, embed=(lambda text: llm.embed(sem, text)) if use_sem else None)
+    return _tools[str(index)]
+
+
+def add_dated_versions(sources, tl, date, terms, max_chars):
+    """Scenario 3, for a question about a past date: next to each article's text today, the text it had on that date,
+    if it was different. Both are kept because a past date in a question may only be when something happened."""
+    for s in sources:
+        if s["kind"] != "article":
+            continue
+        old, since = tl.text_at(s["law"], s["unit"], date)
+        if old is None:
+            continue
+        if old == "":
+            s["dated"] = f"no existía el {date}"
+            continue
+        same = lambda t: re.sub(r"\W+", " ", retrieve.norm(tools.clean(t))).strip()
+        if same(old) == same(s["full"]):
+            s["dated"] = f"mismo texto el {date}"
+            continue
+        s["dated"] = f"cambiado después del {date}"
+        s["text"] += f"\n\n--- Versión vigente el {date} (desde {since}) ---\n" + retrieve.best_window(tools.clean(old), terms, max_chars)
 
 
 class Turn(BaseModel):
@@ -158,11 +188,7 @@ def qa(q: Question):
             index = get_index(config)
             if index is None:
                 raise HTTPException(503, "The search database has not been built: run scripts/build_search.py (see the README).")
-            sem = config.get("rag", {}).get("semantic") or {}
-            if str(index) not in _tools:
-                use_sem = index.vectors is not None and sem.get("enabled", True)
-                _tools[str(index)] = tools.Tools(index, ROOT, embed=(lambda text: llm.embed(sem, text)) if use_sem else None)
-            answer, provider, model, seen, trace = agent.run(config, _tools[str(index)], question, history=history, model=q.model,
+            answer, provider, model, seen, trace = agent.run(config, get_tools(index, config), question, history=history, model=q.model,
                                                             system_extra=cite)
             for i, s in enumerate(seen):
                 law = index.laws.get(s["law"], {})
@@ -196,16 +222,21 @@ def qa(q: Question):
             # (rank, scope, status, amended or repealed by), each article's scope, status and version date, and linked articles.
             kg = scenario == "rag-graph"
             users = [t["content"] for t in history if t["role"] == "user"]
-            found, terms = index.context(asked, extra, k=rag.get("results", 6), max_chars=rag.get("max_chars", 1800), hints=hints,
+            found, terms = index.context(asked, extra, k=rag.get("results", 6), max_chars=rag.get("max_chars", 3000), hints=hints,
                                          qvec=vec(asked), sem_weight=sem.get("weight", 1.0),
                                          earlier=(users[0], vec(users[0])) if users else None,
                                          graph=(rag.get("graph") or {}) if kg else None, records=kg)
             sources = [dict(s, n=i + 1, url=f"https://www.boe.es/buscar/act.php?id={s['law']}") for i, s in enumerate(found)]
+            date = retrieve.question_date(asked, time.strftime("%Y-%m-%d")) if kg and (rag.get("graph") or {}).get("dated", True) else None
+            if date:
+                add_dated_versions(sources, get_tools(index, config), date, terms, rag.get("max_chars", 3000))
             blocks = []
             for s in sources:
                 head = s["title"] + (f" — {s['unit']}" if s["unit"] else " — ficha de la norma (LKG 2.0)")
                 if kg:
                     info = [f"ámbito: {s['where']}", s["status"]] + ([f"versión vigente desde {s['since']}"] if s.get("since") else [])
+                    if s.get("dated"):
+                        info.append(s["dated"])
                     if s.get("via"):
                         info.append("enlazado: " + s["via"])
                     head += " (" + "; ".join(info) + ")"

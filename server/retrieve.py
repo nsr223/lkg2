@@ -449,7 +449,7 @@ class Index:
                 lines.append(f"{label.capitalize()}: " + "; ".join(names) + more + ".")
         return "\n".join(lines)
 
-    def context(self, question, extra_terms=(), k=6, max_chars=1800, hints=(), qvec=None, sem_weight=1.0, earlier=None, graph=None,
+    def context(self, question, extra_terms=(), k=6, max_chars=3000, hints=(), qvec=None, sem_weight=1.0, earlier=None, graph=None,
                 records=True):
         """The sources to give the model: records of named laws first (only with records=True), then the articles found.
 
@@ -483,6 +483,36 @@ class Index:
             text = best_window(u["text"], terms, max_chars)
             sources.append({"kind": "article", "law": u["law"], "title": law["title"], "unit": u["unit"],
                             "where": JUR_NAMES.get(law.get("jur"), law.get("jur")), "status": STATUS_ES.get(law.get("status"), "otro"),
-                            "context": u["context"], "since": u["since"], "eli": eli_url(law.get("eli")), "text": text,
+                            "context": u["context"], "since": u["since"], "eli": eli_url(law.get("eli")), "text": text, "full": u["text"],
                             "via": u.get("via")})
         return sources, terms
+
+
+MONTHS = {m: i for i, m in enumerate(("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre",
+                                      "octubre", "noviembre", "diciembre"), 1)}
+SEASONS = {"invierno": 2, "primavera": 5, "verano": 7, "otono": 10}
+
+
+def question_date(question, today):
+    """The past date a question asks about, as YYYY-MM-DD, or None if it asks about today's law.
+
+    Understands "el 3 de marzo de 2020", "en marzo de 2020", "en el verano de 2018", "en 2014" and "antes de 2015"
+    (the day before). Only years before today's year count: "en 2026" or a law's number ("Ley 39/2015") do not.
+    today: YYYY-MM-DD.
+    """
+    q = norm(question)
+    year_now = int(today[:4])
+    pats = [
+        (r"(?:el|del|desde el)\s+(\d{1,2})\s+de\s+(" + "|".join(MONTHS) + r")\s+de(?:l)?\s+((?:19|20)\d\d)",
+         lambda m: (int(m[3]), MONTHS[m[2]], int(m[1]))),
+        (r"antes\s+de(?:l)?\s+(?:ano\s+)?((?:19|20)\d\d)\b", lambda m: (int(m[1]) - 1, 12, 31)),
+        (r"(?:en|de|durante)\s+(" + "|".join(MONTHS) + r")\s+de(?:l)?\s+((?:19|20)\d\d)", lambda m: (int(m[2]), MONTHS[m[1]], 15)),
+        (r"(?:en|durante)\s+(?:el\s+)?(" + "|".join(SEASONS) + r")\s+de(?:l)?\s+((?:19|20)\d\d)", lambda m: (int(m[2]), SEASONS[m[1]], 15)),
+        (r"(?:en|durante)\s+(?:el\s+(?:ano\s+)?)?((?:19|20)\d\d)\b(?!\s*/)", lambda m: (int(m[1]), 6, 30)),
+    ]
+    for pat, get in pats:
+        for m in re.finditer(pat, q):
+            y, mo, d = get(m)
+            if y < year_now and 1 <= mo <= 12 and 1 <= d <= 31:
+                return f"{y:04d}-{mo:02d}-{d:02d}"
+    return None
