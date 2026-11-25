@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import agent  # noqa: E402
 import cites  # noqa: E402
+import evaluate  # noqa: E402
 import llm  # noqa: E402
 import retrieve  # noqa: E402
 import tools  # noqa: E402
@@ -32,6 +33,10 @@ CONFIG = pathlib.Path(os.environ.get("LKG_CONFIG", ROOT / "config.yaml"))
 EXAMPLE_CONFIG = ROOT / "config.example.yaml"   # committed defaults; config.yaml is your own copy (not committed)
 MODES = ("local", "frontier")
 SCENARIOS = ("plain-llm", "rag", "rag-graph", "graph-tools")
+# /api/question names the scenarios by number (as in the project plan) or by a short name
+METHODS = {"1": "plain-llm", "llm": "plain-llm", "2": "rag", "rag": "rag", "3": "rag-graph", "lkg": "rag-graph",
+           "3b": "graph-tools", "lkg-tools": "graph-tools", **{s: s for s in SCENARIOS}}
+LANGUAGES = {"es": " Responde en español.", "en": " Answer in English."}
 _index = {}
 _tools = {}
 
@@ -78,6 +83,8 @@ class Question(BaseModel):
     mode: str | None = Field(None, description="local or frontier; overrides config.yaml for this question")
     scenario: str | None = Field(None, description="plain-llm, rag, rag-graph or graph-tools; overrides config.yaml for this question")
     model: str | None = Field(None, max_length=100, description="model name; overrides config.yaml for this question (same provider)")
+    provider: str | None = Field(None, description="frontier mode: anthropic, openai, gemini or deepseek; overrides config.yaml")
+    language: str | None = Field(None, description="es or en: the language of the answer (default: the question's)")
     history: list[Turn] = Field([], max_length=20, description="earlier turns of the conversation, oldest first; "
                                 "'question' is then the latest user message")
     references: bool = Field(False, description="ask the model to end with a «REFERENCIAS:» list (law, article and paragraph)")
@@ -137,7 +144,10 @@ def qa(q: Question):
         raise HTTPException(422, f"scenario must be one of {SCENARIOS}.")
     question = q.question.strip()
     history = [t.model_dump() for t in q.history]
-    cite = llm.CITATION_PROMPT if q.references else ""
+    if q.language and q.language not in LANGUAGES:
+        raise HTTPException(422, f"language must be one of {tuple(LANGUAGES)}.")
+    cite = (llm.CITATION_PROMPT if q.references else "") + LANGUAGES.get(q.language or "", "")
+    provider = q.provider if mode == "frontier" else None
     start = time.perf_counter()
     sources, terms, trace = [], [], []
     try:
@@ -161,7 +171,7 @@ def qa(q: Question):
                                 "text": "", "via": s["via"]})
         elif scenario == "plain-llm":
             system = (config.get("system_prompt") or llm.SYSTEM_PROMPT) + cite
-            answer, provider, model = llm.ask(config, question, mode, system=system, history=history, model=q.model)
+            answer, provider, model = llm.ask(config, question, mode, system=system, history=history, model=q.model, provider=provider)
         else:
             index = get_index(config)
             if index is None:
@@ -171,7 +181,7 @@ def qa(q: Question):
             # in a conversation, search with everything the user has said: a follow-up alone ("¿seguro?") names no topic
             asked = " ".join([t["content"] for t in history if t["role"] == "user"] + [question])
             if rag.get("rewrite_query", True):
-                words, _, _ = llm.ask(config, asked, mode, system=llm.REWRITE_PROMPT, model=q.model)
+                words, _, _ = llm.ask(config, asked, mode, system=llm.REWRITE_PROMPT, model=q.model, provider=provider)
                 extra, hints = llm.parse_rewrite(words)
                 if not rag.get("suggest_laws", True):
                     hints = []
@@ -202,7 +212,7 @@ def qa(q: Question):
                 blocks.append(f"[{s['n']}] {head}\n{s['text']}")
             prompt = "Fragmentos:\n\n" + "\n\n".join(blocks) + f"\n\nPregunta: {question}"
             system = (config.get("rag_prompt") or llm.RAG_PROMPT) + cite
-            answer, provider, model = llm.ask(config, prompt, mode, system=system, history=history, model=q.model)
+            answer, provider, model = llm.ask(config, prompt, mode, system=system, history=history, model=q.model, provider=provider)
     except llm.ModelError as e:
         raise HTTPException(503, str(e)) from None
     answer, original, notes = answer.strip(), None, []
@@ -213,6 +223,70 @@ def qa(q: Question):
     return Answer(question=q.question, answer=answer, answer_original=original, citation_check=notes, scenario=scenario, mode=mode, provider=provider, model=model,
                   seconds=round(time.perf_counter() - start, 2), sources=[Source(**{k: s.get(k) for k in Source.model_fields}) for s in sources],
                   search_terms=terms, tool_calls=trace)
+
+
+class AskQuestion(BaseModel):
+    question: str = Field(min_length=1, max_length=4000)
+    language: str | None = Field(None, description="es or en: the language of the answer (default: the question's)")
+    method: str = Field("2", description="1 or llm: the model alone; 2 or rag: with the articles found in LKG 2.0; "
+                                          "3 or lkg: with the articles and their links in the graph; "
+                                          "3b or lkg-tools: the model searches LKG 2.0 itself with tools (local models only)")
+    model: str | None = Field(None, max_length=100, description="e.g. gemma3:12b (Ollama), claude-sonnet-5-5, gemini-3.5-flash, "
+                                                                "deepseek-chat; the provider is chosen from the name. "
+                                                                "Default: the model in config.yaml")
+    provider: str | None = Field(None, description="only if the name does not say it: ollama, anthropic, openai, gemini or deepseek")
+    references: bool = Field(False, description="ask the model to end with a «REFERENCIAS:» list")
+
+
+@app.post("/api/question", response_model=Answer)
+def ask_question(a: AskQuestion):
+    """Ask one question with a chosen method (scenario) and model."""
+    scenario = METHODS.get(a.method.strip().lower())
+    if scenario is None:
+        raise HTTPException(422, "method must be 1, 2, 3 or 3b (or llm, rag, lkg, lkg-tools).")
+    provider = a.provider or (llm.provider_for(a.model) if a.model else None)
+    mode = None if provider is None else ("local" if provider == "ollama" else "frontier")
+    return qa(Question(question=a.question, mode=mode, scenario=scenario, model=a.model, language=a.language,
+                       provider=provider if mode == "frontier" else None, references=a.references))
+
+
+class EvaluationRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=4000)
+    answer: str = Field(min_length=1, max_length=12000)
+    reference: str | None = Field(None, max_length=8000, description="the correct answer, if known (makes the grade much more reliable)")
+    history: list[Turn] = Field([], max_length=20, description="earlier turns, if the answer is a reply in a conversation")
+    judges: list[str] | None = Field(None, max_length=5, description="judge model names, e.g. [\"claude-sonnet-5-5\", "
+                                     "\"gemini-3.5-flash\", \"deepseek-chat\"]; default: evaluation.judges in config.yaml")
+
+
+class Verdict(BaseModel):
+    provider: str
+    model: str
+    correct: str | None = Field(None, description="yes, partly, no or unsure")
+    premise: str | None = Field(None, description="none (no wrong assumption in the question), corrected or accepted")
+    reason: str
+    error: str | None = None
+
+
+class Evaluation(BaseModel):
+    correct: str | None = Field(None, description="the grade most judges gave (none if they tie)")
+    agreeing: int = Field(description="how many judges gave that grade")
+    judged: int = Field(description="how many judges answered")
+    verdicts: list[Verdict]
+    seconds: float
+
+
+@app.post("/api/evaluation", response_model=Evaluation)
+def evaluation(e: EvaluationRequest):
+    """Grade an answer with one or more judge models (by default from different providers)."""
+    config = load_config()
+    judges = e.judges or (config.get("evaluation") or {}).get("judges") or []
+    if not judges:
+        raise HTTPException(422, "No judges: give judges, or set evaluation.judges in config.yaml.")
+    start = time.perf_counter()
+    result = evaluate.evaluate(config, judges, e.question.strip(), e.answer.strip(), (e.reference or "").strip() or None,
+                               [t.model_dump() for t in e.history])
+    return Evaluation(**result, seconds=round(time.perf_counter() - start, 2))
 
 
 @app.get("/api/questions")

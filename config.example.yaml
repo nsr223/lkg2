@@ -38,8 +38,12 @@ local:
   think: false                   # thinking models (qwen3 and later) answer directly instead of thinking first
 
 frontier:
-  provider: anthropic            # anthropic, openai or gemini
-  model: claude-sonnet-5-5       # a model name from that provider (e.g. gemini-2.5-flash for gemini)
+  provider: anthropic            # anthropic, openai, gemini or deepseek
+  model: claude-sonnet-5-5       # a model name from that provider (e.g. gemini-3.5-flash for gemini, deepseek-chat for deepseek)
+                                 # POST /api/question picks the provider from the model name instead
+
+evaluation:                      # POST /api/evaluation: models that grade an answer; each needs its API key in .env
+  judges: [claude-sonnet-5-5, gemini-3.5-flash, deepseek-chat]
 
 temperature: 0                   # remove this line if a model rejects it
 timeout: 120                     # seconds to wait for an answer

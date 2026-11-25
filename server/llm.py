@@ -1,7 +1,7 @@
 """Model back ends for the LKG 2.0 Q&A service.
 
-Scenario 1 (plain LLM): the model answers from what it already knows, with no
-retrieval. Retrieval over LKG 2.0 (RAG / MCP) will be added as other scenarios.
+Local models run in Ollama; hosted ("frontier") models are Anthropic, OpenAI, Gemini and DeepSeek, with API keys
+in the .env file.
 """
 import os
 import re
@@ -18,6 +18,7 @@ KEY_NAMES = {
     "anthropic": ["ANTHROPIC_API_KEY"],
     "openai": ["OPENAI_API_KEY"],
     "gemini": ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
+    "deepseek": ["DEEPSEEK_API_KEY"],
 }
 
 
@@ -96,14 +97,23 @@ def ask_anthropic(cfg, turns, system, temperature, timeout):
     return "".join(b.get("text", "") for b in data.get("content", [])), "anthropic", model
 
 
-def ask_openai(cfg, turns, system, temperature, timeout):
+def _chat_completions(provider, url, cfg, turns, system, temperature, timeout):
+    """OpenAI's chat format, which DeepSeek's API also uses."""
     model = cfg["model"]
     body = {"model": model, "messages": [{"role": "system", "content": system}] + turns}
     if temperature is not None:
         body["temperature"] = temperature
-    headers = {"Authorization": f"Bearer {_key('openai')}"}
-    data = _post("https://api.openai.com/v1/chat/completions", body, headers, timeout)
-    return data["choices"][0]["message"]["content"], "openai", model
+    headers = {"Authorization": f"Bearer {_key(provider)}"}
+    data = _post(url, body, headers, timeout)
+    return data["choices"][0]["message"]["content"], provider, model
+
+
+def ask_openai(cfg, turns, system, temperature, timeout):
+    return _chat_completions("openai", "https://api.openai.com/v1/chat/completions", cfg, turns, system, temperature, timeout)
+
+
+def ask_deepseek(cfg, turns, system, temperature, timeout):
+    return _chat_completions("deepseek", "https://api.deepseek.com/chat/completions", cfg, turns, system, temperature, timeout)
 
 
 def ask_gemini(cfg, turns, system, temperature, timeout):
@@ -134,15 +144,30 @@ def embed(cfg, text, timeout=60):
     return data["embeddings"][0]
 
 
-FRONTIER = {"anthropic": ask_anthropic, "openai": ask_openai, "gemini": ask_gemini}
+FRONTIER = {"anthropic": ask_anthropic, "openai": ask_openai, "gemini": ask_gemini, "deepseek": ask_deepseek}
+
+# Hosted models by the start of their name. Anything else (gemma3:12b, qwen2.5:7b, deepseek-r1:8b...) is an Ollama model.
+NAME_PREFIXES = (("claude", "anthropic"), ("gemini", "gemini"), ("gemma-", "gemini"), ("gpt-", "openai"), ("o1", "openai"),
+                 ("o3", "openai"), ("o4", "openai"), ("deepseek-chat", "deepseek"), ("deepseek-reasoner", "deepseek"))
 
 
-def describe(config, mode, model=None):
+def provider_for(model):
+    """Which provider serves a model, from its name: "claude-sonnet-5-5" -> anthropic, "gemini-3.5-flash" -> gemini,
+    "deepseek-chat" -> deepseek, "gpt-..." -> openai. Names with a tag ("gemma3:12b") and any others -> ollama."""
+    name = model.strip().lower()
+    if ":" not in name:
+        for prefix, provider in NAME_PREFIXES:
+            if name.startswith(prefix):
+                return provider
+    return "ollama"
+
+
+def describe(config, mode, model=None, provider=None):
     """Which provider and model a question would go to, without calling it."""
     if mode == "local":
         return "ollama", model or config["local"]["model"]
     f = config["frontier"]
-    return f["provider"], model or f["model"]
+    return provider or f["provider"], model or f["model"]
 
 
 RAG_PROMPT = (
@@ -182,11 +207,12 @@ CITATION_PROMPT = (
 )
 
 
-def ask(config, question, mode, system=None, history=None, model=None):
+def ask(config, question, mode, system=None, history=None, model=None, provider=None):
     """Send one question to the configured model. Returns (answer, provider, model).
 
     history: earlier turns of the conversation, [{"role": "user" | "assistant", "content": "..."}, ...].
-    model: use this model instead of the one in config.yaml (same provider).
+    model: use this model instead of the one in config.yaml (same provider, unless provider is given).
+    provider: for mode "frontier", use this provider instead of the one in config.yaml.
     """
     system = system or config.get("system_prompt") or SYSTEM_PROMPT
     temperature = config.get("temperature", 0)
@@ -194,7 +220,7 @@ def ask(config, question, mode, system=None, history=None, model=None):
     turns = list(history or []) + [{"role": "user", "content": question}]
     if mode == "local":
         return ask_ollama(dict(config["local"], **({"model": model} if model else {})), turns, system, temperature, timeout)
-    provider = config["frontier"]["provider"]
+    provider = provider or config["frontier"]["provider"]
     if provider not in FRONTIER:
-        raise ModelError(f"Unknown frontier provider {provider!r}: use anthropic, openai or gemini.")
+        raise ModelError(f"Unknown frontier provider {provider!r}: use anthropic, openai, gemini or deepseek.")
     return FRONTIER[provider](dict(config["frontier"], **({"model": model} if model else {})), turns, system, temperature, timeout)

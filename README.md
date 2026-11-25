@@ -77,7 +77,7 @@ restart is needed, and git ignores it). Without a `config.yaml`, the server uses
 
 - `mode: local` uses [Ollama](https://ollama.com) on your computer: install it, run `ollama pull qwen2.5:7b`
   (or `llama3.1:8b`, `gemma2:9b`, …) and set `local.model`.
-- `mode: frontier` uses a hosted model: set `frontier.provider` (`anthropic`, `openai` or `gemini`) and
+- `mode: frontier` uses a hosted model: set `frontier.provider` (`anthropic`, `openai`, `gemini` or `deepseek`) and
   `frontier.model`, and put the API key in a `.env` file (copy `.env.example`). `.env` is ignored by git.
 
 **API**
@@ -96,6 +96,29 @@ Three more optional fields, used for evaluation runs:
   conversation; `question` is then the latest user message. In `rag`, the search uses everything the user has said.
 - `"references": true` asks the model to end with a `REFERENCIAS:` list (law, article and paragraph), so answers
   with and without retrieval can be checked in the same way.
+
+**Asking with a chosen method and model**: `POST /api/question` is the simplest way in.
+
+```json
+{"question": "Un vecino me debe 120 euros. ¿Puedo reclamárselos ante el juez de paz?",
+ "language": "es", "method": "2", "model": "gemma3:12b"}
+```
+
+- `method`: `1` (or `llm`) the model alone; `2` (`rag`) with the articles found in LKG 2.0; `3` (`lkg`) with the
+  articles and their links in the graph; `3b` (`lkg-tools`) the model searches LKG 2.0 itself with tools (local models only).
+- `model`: the provider is chosen from the name: `claude-…` Anthropic, `gemini-…` Gemini, `gpt-…` OpenAI,
+  `deepseek-chat` / `deepseek-reasoner` DeepSeek, and anything else (`gemma3:12b`, `qwen2.5:7b`) Ollama. Without
+  `model`, `config.yaml` decides. Hosted models need their API key in `.env`.
+- `language`: `es` or `en`, the language of the answer (default: the question's).
+
+It returns the same fields as `POST /api/qa`.
+
+**Grading an answer**: `POST /api/evaluation` with `{"question": "...", "answer": "...", "reference": "..."}` asks one
+or more judge models whether the answer is right, and returns each judge's verdict (`correct`: yes, partly, no or
+unsure; `premise`: whether the question had a wrong assumption and the answer corrected it; a short reason), the grade
+most judges gave and how many agreed. `reference` (the correct answer) is optional but makes the grade far more
+reliable. The judges are `evaluation.judges` in `config.yaml` (by default one each from Anthropic, Gemini and DeepSeek),
+or `"judges": [...]` in the request.
 
 `GET /api/questions` returns the demo questions shown in the tab. They are read from `private/questions.json`, which
 git ignores, so they stay off the web and out of future model training data. Ask the authors for the file.
