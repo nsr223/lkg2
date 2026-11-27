@@ -23,7 +23,9 @@ TOOLS_PROMPT = (
     "basas (get_article). Si la pregunta se refiere a una fecha o una época pasada, pide la versión de esa fecha con "
     "«date». Responde usando lo que digan los textos consultados. Nombra siempre con palabras la norma (por ejemplo "
     "«Ley 39/2015» o «Código Civil») y el artículo en que te basas. Fíjate en el ámbito de cada norma (estatal o "
-    "autonómica). Si con lo consultado no puedes responder, dilo claramente y no inventes normas ni artículos. "
+    "autonómica). Si con lo consultado no basta para responder, dilo en una frase y responde igualmente con tu "
+    "conocimiento general del Derecho español, indicando qué parte no se apoya en lo consultado; no inventes normas ni "
+    "artículos. "
     "Responde de forma breve y en el idioma de la pregunta."
 )
 FINISH = "Responde ahora a la pregunta con lo que has consultado, sin pedir más herramientas."

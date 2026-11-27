@@ -175,8 +175,9 @@ RAG_PROMPT = (
     "que se te dan (de LKG 2.0, a partir de los textos del BOE). Nombra siempre con palabras la norma (por ejemplo "
     "«Ley 39/2015» o «Código Civil») y el artículo en que te basas, y añade el número del fragmento entre corchetes, "
     "p. ej. «artículo 30 de la Ley 39/2015 [2]». Fíjate en el ámbito de cada norma (estatal o "
-    "autonómica). Si los fragmentos no bastan para responder, dilo "
-    "claramente y no inventes normas ni artículos. Responde de forma breve y en el idioma de la pregunta."
+    "autonómica). Si los fragmentos no bastan para responder, dilo en una frase y responde igualmente con tu "
+    "conocimiento general del Derecho español, indicando qué parte no se apoya en los fragmentos; no inventes normas ni "
+    "artículos. Responde de forma breve y en el idioma de la pregunta."
 )
 
 REWRITE_PROMPT = (

@@ -205,7 +205,8 @@ class Tools:
     def search_articles(self, query, law=None, date=None):
         hints = [law] if law else []
         qvec = self.embed(query) if self.embed else None
-        units, terms = self.ix.search(query, k=6, hints=hints, qvec=qvec)
+        # a law the model asks for by name is searched even if it is regional
+        units, terms = self.ix.search(query, k=6, hints=hints, qvec=qvec, regional="all" if law else "mentioned")
         if law:
             lid = self.law_id(law)
             if lid:

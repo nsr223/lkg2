@@ -146,6 +146,11 @@ python server/ask_all.py --questions path/to/benchmark.jsonl --scenario rag --mo
 - `rag-graph` (scenario 3a, text + knowledge graph in the prompt): the same search, plus what LKG 2.0's graph adds: a record of each
   law the question names (rank, scope, status, amended by, repealed by), each article's scope, status and the date its
   current version took effect, and articles reached by following links from the best results (see below).
+  Search details for scenarios 2 and 3 (all in `config.yaml` under `rag`): regional laws are only used for regions the
+  question mentions (by name, demonym, province or city) or laws it names (`regional`); final provisions that only say
+  when a law comes into force are pushed down (`boilerplate`); multiple-choice option lines are left out of the search
+  (`strip_options`). If the sources do not cover the question, the model says so in one sentence and still answers
+  from general knowledge, marking what the sources do not support.
   If the question asks about a past date ("en 2014", "en marzo de 2020", "antes de 2015"), each article is also given
   as it read on that date, from the version history, when that text was different (`rag.graph.dated`). Today's text
   stays too, because a past date in a question may only be when something happened.

@@ -72,6 +72,57 @@ REGIONS = {"andalucia": "es-an", "aragon": "es-ar", "asturias": "es-as", "cantab
            "extremadura": "es-ex", "galicia": "es-ga", "baleares": "es-ib", "illes balears": "es-ib", "murcia": "es-mc",
            "madrid": "es-md", "navarra": "es-nc", "pais vasco": "es-pv", "euskadi": "es-pv", "la rioja": "es-ri",
            "valenciana": "es-vc", "valencia": "es-vc", "ceuta": "es-ce", "melilla": "es-ml"}
+# words that place a question in a region without naming it: demonyms, provinces and big cities. Used only to allow
+# that region's laws when regional law is limited to regions the question mentions (see Index.search).
+REGION_PLACES = {
+    "es-an": "andaluz, andaluza, sevilla, malaga, cadiz, cordoba, granada, almeria, huelva, jaen",
+    "es-ar": "aragones, aragonesa, zaragoza, huesca, teruel",
+    "es-as": "asturiano, asturiana, oviedo, gijon",
+    "es-cb": "cantabro, cantabra, santander",
+    "es-cl": "castellano leones, castellanoleones, castellanoleonesa, valladolid, burgos, salamanca, segovia, avila, soria, "
+             "zamora, palencia",
+    "es-cm": "castellano manchego, castellanomanchego, castellanomanchega, toledo, albacete, ciudad real, cuenca",
+    "es-cn": "canario, canaria, tenerife, gran canaria, las palmas, lanzarote, fuerteventura",
+    "es-ct": "catalan, catalana, catalanes, barcelona, girona, gerona, lleida, lerida, tarragona",
+    "es-ex": "extremeno, extremena, badajoz, caceres",
+    "es-ga": "gallego, gallega, a coruna, la coruna, ourense, orense, pontevedra, vigo, santiago de compostela",
+    "es-ib": "balear, mallorca, menorca, ibiza, eivissa, formentera, palma de mallorca",
+    "es-mc": "murciano, murciana, cartagena",
+    "es-md": "madrileno, madrilena",
+    "es-nc": "navarro, pamplona, iruna",
+    "es-pv": "vasco, vasca, vascos, bizkaia, vizcaya, gipuzkoa, guipuzcoa, alava, araba, bilbao, vitoria, donostia, "
+             "san sebastian",
+    "es-ri": "riojano, riojana, logrono",
+    "es-vc": "valenciano, alicante, castellon, elche",
+}
+FORAL_JURS = ("es-ar", "es-ct", "es-ga", "es-ib", "es-nc", "es-pv")   # regions with their own civil (foral) law
+BOILERPLATE = re.compile(r"entrar[aá] en vigor|entrada en vigor|t[ií]tulo competencial|se dicta al amparo|habilitaci[oó]n "
+                         r"(normativa|para el desarrollo)|desarrollo reglamentario|facultad(es)? de desarrollo", re.I)
+OPTION_LINE = re.compile(r"^\s*\(?[a-d][\)\.]\s.*$", re.M)
+
+
+def search_text(question):
+    """The question as used for searching: without multiple-choice option lines ("a) ...") and the instruction to pick
+    one, which add many unrelated words. The model still sees the whole question."""
+    q = OPTION_LINE.sub("", question)
+    q = re.sub(r"Señala la opci[oó]n.*$", "", q, flags=re.I | re.M)
+    q = re.sub(r"\n{3,}", "\n\n", q).strip()
+    return q if len(q) >= 15 else question
+
+
+def places(question):
+    """Regions a question mentions by name, demonym, province or city (as jurisdiction codes)."""
+    q = norm(question)
+    found = {j for name, j in REGIONS.items() if re.search(rf"(?<![a-z]){name}(?![a-z])", q)}
+    for j, words in REGION_PLACES.items():
+        for w in words.split(", "):
+            if re.search(rf"(?<![a-z]){w}(?![a-z])", q):
+                found.add(j)
+    if re.search(r"(?<![a-z])(derecho|ley|legislacion|vecindad) (civil )?foral", q):
+        found.update(FORAL_JURS)
+    return found
+
+
 JUR_NAMES = {"es": "estatal", "es-an": "Andalucía", "es-ar": "Aragón", "es-as": "Asturias", "es-cb": "Cantabria",
              "es-cl": "Castilla y León", "es-cm": "Castilla-La Mancha", "es-cn": "Canarias", "es-ct": "Cataluña",
              "es-ex": "Extremadura", "es-ga": "Galicia", "es-ib": "Illes Balears", "es-mc": "Región de Murcia",
@@ -278,9 +329,14 @@ class Index:
                               (law, f"Artículo {number}", f"Artículo {number} %")).fetchone()
         return row[0] if row else None
 
-    def search(self, question, extra_terms=(), k=6, per_law=3, hints=(), qvec=None, sem_weight=1.0):
+    def search(self, question, extra_terms=(), k=6, per_law=3, hints=(), qvec=None, sem_weight=1.0, regional="mentioned",
+               boilerplate=0.5):
         """hints: names of laws that probably govern the question (suggested by the model before the search).
-        qvec: the question as a vector (same model as the article vectors); adds search by meaning to search by words."""
+        qvec: the question as a vector (same model as the article vectors); adds search by meaning to search by words.
+        regional: "mentioned" keeps regional laws only for regions the question mentions (by name, demonym, province or
+        city, or "derecho foral"), or laws the question names; "all" keeps every law.
+        boilerplate: score taken off final provisions that only say when a law comes into force, under what power it is
+        made or who may develop it, unless the question names that law; they match many questions and answer few."""
         terms = self.terms(question)
         for t in self.terms(" ".join(extra_terms)):
             if t not in terms:
@@ -333,6 +389,14 @@ class Index:
                     pinned.append(rid)
         if not cand and not pinned:
             return [], terms
+        if regional == "mentioned":   # drop other regions' laws: they mislead more than they help
+            allowed = places(question) | set(regions)
+            keep = lambda rowid: (self._law_of(rowid).get("jur") in ("es", None) or self._law_of(rowid).get("jur") in allowed
+                                  or self._law_of(rowid).get("id") in named)
+            cand = {r: v for r, v in cand.items() if keep(r)}
+            pinned = [r for r in pinned if keep(r)]
+            if not cand and not pinned:
+                return [], terms
         top = (max(cand.values()) if cand else 1.0) or 1.0
         scored = []
         for rowid, s in cand.items():
@@ -344,6 +408,9 @@ class Index:
             place = (0.4 if law.get("jur") in regions else 0) if regions else (0.25 if law.get("jur") == "es" else 0)
             score = (s / top) + sem_weight * sem.get(rowid, 0.0) + 0.15 * RANK_BOOST.get(law.get("rank"), 0) + (0.5 if u["law"] in named else 0.4 if u["law"] in hinted else 0) \
                 + 0.2 * in_title + 0.3 * min(1.0, per_law_hits.get(u["law"], 0) / 15) + place - (0.3 if junk else 0)
+            if boilerplate and u["law"] not in named and u["unit"].lower().startswith("disposición final") \
+                    and len(u["text"]) < 1500 and BOILERPLATE.search(u["text"]):
+                score -= boilerplate
             scored.append((score, u))
         scored.sort(key=lambda x: -x[0])
         out, per = [], {}
@@ -450,7 +517,7 @@ class Index:
         return "\n".join(lines)
 
     def context(self, question, extra_terms=(), k=6, max_chars=3000, hints=(), qvec=None, sem_weight=1.0, earlier=None, graph=None,
-                records=True):
+                records=True, regional="mentioned", boilerplate=0.5):
         """The sources to give the model: records of named laws first (only with records=True), then the articles found.
 
         records: add a record of each law the question names (rank, scope, status and its links in the graph).
@@ -462,9 +529,11 @@ class Index:
         graph: scenario 3 settings, e.g. {"slots": 1, "links": ["text"]}. The last `slots` places go
         to articles reached by following links from the best results (see expand); the total stays k.
         """
-        units, terms = self.search(question, extra_terms, k=k, hints=hints, qvec=qvec, sem_weight=sem_weight)
+        units, terms = self.search(question, extra_terms, k=k, hints=hints, qvec=qvec, sem_weight=sem_weight,
+                                   regional=regional, boilerplate=boilerplate)
         if earlier:
-            first, _ = self.search(earlier[0], extra_terms, k=k, hints=hints, qvec=earlier[1], sem_weight=sem_weight)
+            first, _ = self.search(earlier[0], extra_terms, k=k, hints=hints, qvec=earlier[1], sem_weight=sem_weight,
+                                   regional=regional, boilerplate=boilerplate)
             keep = first[:(k + 1) // 2]
             units = (keep + [u for u in units if all(u["rowid"] != f["rowid"] for f in keep)])[:k]
         if graph:

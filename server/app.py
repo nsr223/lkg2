@@ -206,6 +206,7 @@ def qa(q: Question):
             extra, hints = [], []
             # in a conversation, search with everything the user has said: a follow-up alone ("¿seguro?") names no topic
             asked = " ".join([t["content"] for t in history if t["role"] == "user"] + [question])
+            query = retrieve.search_text(asked) if rag.get("strip_options", True) else asked
             if rag.get("rewrite_query", True):
                 words, _, _ = llm.ask(config, asked, mode, system=llm.REWRITE_PROMPT, model=q.model, provider=provider)
                 extra, hints = llm.parse_rewrite(words)
@@ -222,10 +223,11 @@ def qa(q: Question):
             # (rank, scope, status, amended or repealed by), each article's scope, status and version date, and linked articles.
             kg = scenario == "rag-graph"
             users = [t["content"] for t in history if t["role"] == "user"]
-            found, terms = index.context(asked, extra, k=rag.get("results", 6), max_chars=rag.get("max_chars", 3000), hints=hints,
-                                         qvec=vec(asked), sem_weight=sem.get("weight", 1.0),
+            found, terms = index.context(query, extra, k=rag.get("results", 6), max_chars=rag.get("max_chars", 3000), hints=hints,
+                                         qvec=vec(query), sem_weight=sem.get("weight", 1.0),
                                          earlier=(users[0], vec(users[0])) if users else None,
-                                         graph=(rag.get("graph") or {}) if kg else None, records=kg)
+                                         graph=(rag.get("graph") or {}) if kg else None, records=kg,
+                                         regional=rag.get("regional", "mentioned"), boilerplate=rag.get("boilerplate", 0.5))
             sources = [dict(s, n=i + 1, url=f"https://www.boe.es/buscar/act.php?id={s['law']}") for i, s in enumerate(found)]
             date = retrieve.question_date(asked, time.strftime("%Y-%m-%d")) if kg and (rag.get("graph") or {}).get("dated", True) else None
             if date:

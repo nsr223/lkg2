@@ -16,6 +16,10 @@ rag:
   max_chars: 3000                # longest piece of one article given to the model (long articles are cut to the best part);
                                  # chosen on the 2020 Workers' Statute dataset (legal-qa-benchmark/scripts/tune_rag_2020.py)
   fix_citations: true           # if the model puts the wrong [n] next to an article it names, correct it to the right source
+  regional: mentioned           # mentioned: regional laws only for regions the question mentions (name, demonym, province,
+                                 # city, or "derecho foral") or laws it names; all: every law
+  boilerplate: 0.5              # score taken off final provisions that only say when a law comes into force or who may develop it
+  strip_options: true           # search without multiple-choice option lines ("a) ..."); the model still sees them
                                  # (the answer before the fix is kept in answer_original)
   semantic:                      # search by meaning as well as by words; used only if scripts/build_vectors.py has been run
     enabled: true
