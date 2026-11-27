@@ -8,6 +8,7 @@ import bisect
 import json
 import os
 import re
+import time
 import sqlite3
 import unicodedata
 import zlib
@@ -330,13 +331,17 @@ class Index:
         return row[0] if row else None
 
     def search(self, question, extra_terms=(), k=6, per_law=3, hints=(), qvec=None, sem_weight=1.0, regional="mentioned",
-               boilerplate=0.5):
+               boilerplate=0.5, transitional=0.5):
         """hints: names of laws that probably govern the question (suggested by the model before the search).
         qvec: the question as a vector (same model as the article vectors); adds search by meaning to search by words.
         regional: "mentioned" keeps regional laws only for regions the question mentions (by name, demonym, province or
         city, or "derecho foral"), or laws the question names; "all" keeps every law.
-        boilerplate: score taken off final provisions that only say when a law comes into force, under what power it is
-        made or who may develop it, unless the question names that law; they match many questions and answer few."""
+        boilerplate: score taken off final provisions (and treaty articles) that only say when a law comes into force,
+        under what power it is made or who may develop it, unless the question names that law; they match many
+        questions and answer few.
+        transitional: score taken off transitional provisions of laws the question does not name or the model does not
+        suggest, unless the question asks about a past date: they settle one law's changeover and crowd out general rules."""
+        past = question_date(question, time.strftime("%Y-%m-%d")) is not None
         terms = self.terms(question)
         for t in self.terms(" ".join(extra_terms)):
             if t not in terms:
@@ -408,9 +413,12 @@ class Index:
             place = (0.4 if law.get("jur") in regions else 0) if regions else (0.25 if law.get("jur") == "es" else 0)
             score = (s / top) + sem_weight * sem.get(rowid, 0.0) + 0.15 * RANK_BOOST.get(law.get("rank"), 0) + (0.5 if u["law"] in named else 0.4 if u["law"] in hinted else 0) \
                 + 0.2 * in_title + 0.3 * min(1.0, per_law_hits.get(u["law"], 0) / 15) + place - (0.3 if junk else 0)
-            if boilerplate and u["law"] not in named and u["unit"].lower().startswith("disposición final") \
-                    and len(u["text"]) < 1500 and BOILERPLATE.search(u["text"]):
+            if boilerplate and u["law"] not in named and len(u["text"]) < 1500 and BOILERPLATE.search(u["text"]) \
+                    and (u["unit"].lower().startswith("disposición final") or law.get("rank") == "acuerdo_internacional"):
                 score -= boilerplate
+            if transitional and not past and u["law"] not in named and u["law"] not in hinted \
+                    and u["unit"].lower().startswith("disposición transitoria"):
+                score -= transitional
             scored.append((score, u))
         scored.sort(key=lambda x: -x[0])
         out, per = [], {}
@@ -517,7 +525,7 @@ class Index:
         return "\n".join(lines)
 
     def context(self, question, extra_terms=(), k=6, max_chars=3000, hints=(), qvec=None, sem_weight=1.0, earlier=None, graph=None,
-                records=True, regional="mentioned", boilerplate=0.5):
+                records=True, regional="mentioned", boilerplate=0.5, transitional=0.5):
         """The sources to give the model: records of named laws first (only with records=True), then the articles found.
 
         records: add a record of each law the question names (rank, scope, status and its links in the graph).
@@ -530,10 +538,10 @@ class Index:
         to articles reached by following links from the best results (see expand); the total stays k.
         """
         units, terms = self.search(question, extra_terms, k=k, hints=hints, qvec=qvec, sem_weight=sem_weight,
-                                   regional=regional, boilerplate=boilerplate)
+                                   regional=regional, boilerplate=boilerplate, transitional=transitional)
         if earlier:
             first, _ = self.search(earlier[0], extra_terms, k=k, hints=hints, qvec=earlier[1], sem_weight=sem_weight,
-                                   regional=regional, boilerplate=boilerplate)
+                                   regional=regional, boilerplate=boilerplate, transitional=transitional)
             keep = first[:(k + 1) // 2]
             units = (keep + [u for u in units if all(u["rowid"] != f["rowid"] for f in keep)])[:k]
         if graph:

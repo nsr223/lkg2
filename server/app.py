@@ -227,7 +227,8 @@ def qa(q: Question):
                                          qvec=vec(query), sem_weight=sem.get("weight", 1.0),
                                          earlier=(users[0], vec(users[0])) if users else None,
                                          graph=(rag.get("graph") or {}) if kg else None, records=kg,
-                                         regional=rag.get("regional", "mentioned"), boilerplate=rag.get("boilerplate", 0.5))
+                                         regional=rag.get("regional", "mentioned"), boilerplate=rag.get("boilerplate", 0.5),
+                                         transitional=rag.get("transitional", 0.5))
             sources = [dict(s, n=i + 1, url=f"https://www.boe.es/buscar/act.php?id={s['law']}") for i, s in enumerate(found)]
             date = retrieve.question_date(asked, time.strftime("%Y-%m-%d")) if kg and (rag.get("graph") or {}).get("dated", True) else None
             if date:
